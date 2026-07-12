@@ -1,0 +1,13 @@
+{
+  "domain": "eyefi",
+  "name": "Eye-Fi",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/dgtlrift/eye-fi-service-integration",
+  "issue_tracker": "https://github.com/dgtlrift/eye-fi-service-integration/issues",
+  "iot_class": "local_push",
+  "requirements": [
+    "eyefi-core @ git+https://github.com/dgtlrift/eye-fi-service-integration.git@main"
+  ],
+  "version": "0.1.0"
+}

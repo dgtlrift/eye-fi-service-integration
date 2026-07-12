@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add an Eye-Fi card",
+        "description": "Enter the card's MAC address and upload key (found in Eye-Fi Manager's Settings.xml, or on the card packaging), the local directory to use for downloads/spooling, and where uploaded photos should end up.",
+        "data": {
+          "mac": "MAC address (12 hex characters, no colons)",
+          "upload_key": "Upload key (32 hex characters)",
+          "download_dir": "Local download/spool directory",
+          "port": "Listen port",
+          "destination": "Storage destination",
+          "geotag_backend": "Geotagging backend"
+        }
+      },
+      "destination": {
+        "title": "Configure the storage destination",
+        "description": "Fields depend on the destination you chose."
+      },
+      "geotag": {
+        "title": "Configure the geotagging backend",
+        "description": "Provide credentials for the geolocation API used to resolve GPS coordinates from the card's WiFi scan."
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Add another card",
+        "data": {
+          "mac": "MAC address (12 hex characters, no colons)",
+          "upload_key": "Upload key (32 hex characters)"
+        }
+      }
+    }
+  }
+}
