@@ -19,7 +19,7 @@ remote_nas = ["smbprotocol>=1.13", "asyncssh>=2.14"]
 onedrive = []
 smugmug = ["requests-oauthlib>=1.3"]
 pcloud = []
-dev = ["pytest", "pytest-asyncio"]
+dev = ["pytest", "pytest-asyncio", "pillow", "voluptuous", "voluptuous-serialize"]
 
 [tool.setuptools.packages.find]
 include = ["eyefi_core*"]

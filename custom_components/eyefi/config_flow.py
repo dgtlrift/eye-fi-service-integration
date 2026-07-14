@@ -52,30 +52,30 @@ _MAC_RE = re.compile(r"^[0-9a-f]{12}$")
 _UPLOAD_KEY_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
-def _normalize_mac(value: str) -> str:
+def _normalize_mac(value: str) -> str | None:
     """Card utilities (e.g. eyefi-config -m) print the MAC colon-separated
     (``00:18:56:41:25:f5``), but the wire protocol's <macaddress> element —
     and eyefi_core's card lookup — uses the bare 12-hex-char form with no
-    separators. Strip separators here so either form works."""
+    separators. Strip separators here so either form works.
+
+    Done as a plain function called from the step handler, NOT as a
+    voluptuous validator on the schema — ``voluptuous_serialize`` (which HA
+    uses to turn the schema into a frontend form spec) can't serialize an
+    arbitrary custom function and raises ValueError if one is used there.
+    """
     normalized = re.sub(r"[:\-\s]", "", value).lower()
-    if not _MAC_RE.match(normalized):
-        raise vol.Invalid(
-            "MAC address must be 12 hex characters (colons/dashes are stripped automatically)"
-        )
-    return normalized
+    return normalized if _MAC_RE.match(normalized) else None
 
 
-def _normalize_upload_key(value: str) -> str:
+def _normalize_upload_key(value: str) -> str | None:
     normalized = re.sub(r"[\-\s]", "", value).lower()
-    if not _UPLOAD_KEY_RE.match(normalized):
-        raise vol.Invalid("Upload key must be 32 hex characters")
-    return normalized
+    return normalized if _UPLOAD_KEY_RE.match(normalized) else None
 
 
 _CARD_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_MAC): vol.All(str, _normalize_mac),
-        vol.Required(CONF_UPLOAD_KEY): vol.All(str, _normalize_upload_key),
+        vol.Required(CONF_MAC): str,
+        vol.Required(CONF_UPLOAD_KEY): str,
         vol.Required(CONF_DOWNLOAD_DIR): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
         vol.Required(CONF_DESTINATION, default=DESTINATION_LOCAL_NAS): vol.In(DESTINATIONS),
@@ -140,16 +140,22 @@ class EyeFiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            self._data = {
-                CONF_CARDS: [
-                    {CONF_MAC: user_input[CONF_MAC], CONF_UPLOAD_KEY: user_input[CONF_UPLOAD_KEY]}
-                ],
-                CONF_DOWNLOAD_DIR: user_input[CONF_DOWNLOAD_DIR],
-                CONF_PORT: user_input[CONF_PORT],
-                CONF_DESTINATION: user_input[CONF_DESTINATION],
-                CONF_GEOTAG_BACKEND: user_input[CONF_GEOTAG_BACKEND],
-            }
-            return await self.async_step_destination()
+            mac = _normalize_mac(user_input[CONF_MAC])
+            upload_key = _normalize_upload_key(user_input[CONF_UPLOAD_KEY])
+            if mac is None:
+                errors[CONF_MAC] = "invalid_mac"
+            if upload_key is None:
+                errors[CONF_UPLOAD_KEY] = "invalid_upload_key"
+
+            if not errors:
+                self._data = {
+                    CONF_CARDS: [{CONF_MAC: mac, CONF_UPLOAD_KEY: upload_key}],
+                    CONF_DOWNLOAD_DIR: user_input[CONF_DOWNLOAD_DIR],
+                    CONF_PORT: user_input[CONF_PORT],
+                    CONF_DESTINATION: user_input[CONF_DESTINATION],
+                    CONF_GEOTAG_BACKEND: user_input[CONF_GEOTAG_BACKEND],
+                }
+                return await self.async_step_destination()
 
         return self.async_show_form(step_id="user", data_schema=_CARD_SCHEMA, errors=errors)
 
@@ -197,21 +203,26 @@ class EyeFiOptionsFlow(config_entries.OptionsFlow):
         self._config_entry = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            cards = list(self._config_entry.data.get(CONF_CARDS, []))
-            cards.append(
-                {CONF_MAC: user_input[CONF_MAC], CONF_UPLOAD_KEY: user_input[CONF_UPLOAD_KEY]}
-            )
-            new_data = {**self._config_entry.data, CONF_CARDS: cards}
-            self.hass.config_entries.async_update_entry(self._config_entry, data=new_data)
-            return self.async_create_entry(title="", data={})
+            mac = _normalize_mac(user_input[CONF_MAC])
+            upload_key = _normalize_upload_key(user_input[CONF_UPLOAD_KEY])
+            if mac is None:
+                errors[CONF_MAC] = "invalid_mac"
+            if upload_key is None:
+                errors[CONF_UPLOAD_KEY] = "invalid_upload_key"
+
+            if not errors:
+                cards = list(self._config_entry.data.get(CONF_CARDS, []))
+                cards.append({CONF_MAC: mac, CONF_UPLOAD_KEY: upload_key})
+                new_data = {**self._config_entry.data, CONF_CARDS: cards}
+                self.hass.config_entries.async_update_entry(self._config_entry, data=new_data)
+                return self.async_create_entry(title="", data={})
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_MAC): vol.All(str, _normalize_mac),
-                    vol.Required(CONF_UPLOAD_KEY): vol.All(str, _normalize_upload_key),
-                }
+                {vol.Required(CONF_MAC): str, vol.Required(CONF_UPLOAD_KEY): str}
             ),
+            errors=errors,
         )

@@ -5,7 +5,7 @@
         "title": "Add an Eye-Fi card",
         "description": "Enter the card's MAC address and upload key (found in Eye-Fi Manager's Settings.xml, or on the card packaging), the local directory to use for downloads/spooling, and where uploaded photos should end up.",
         "data": {
-          "mac": "MAC address (12 hex characters, no colons)",
+          "mac": "MAC address (with or without colons)",
           "upload_key": "Upload key (32 hex characters)",
           "download_dir": "Local download/spool directory",
           "port": "Listen port",
@@ -21,6 +21,10 @@
         "title": "Configure the geotagging backend",
         "description": "Provide credentials for the geolocation API used to resolve GPS coordinates from the card's WiFi scan."
       }
+    },
+    "error": {
+      "invalid_mac": "MAC address must be 12 hex characters (colons/dashes are stripped automatically)",
+      "invalid_upload_key": "Upload key must be 32 hex characters"
     }
   },
   "options": {
@@ -28,10 +32,14 @@
       "init": {
         "title": "Add another card",
         "data": {
-          "mac": "MAC address (12 hex characters, no colons)",
+          "mac": "MAC address (with or without colons)",
           "upload_key": "Upload key (32 hex characters)"
         }
       }
+    },
+    "error": {
+      "invalid_mac": "MAC address must be 12 hex characters (colons/dashes are stripped automatically)",
+      "invalid_upload_key": "Upload key must be 32 hex characters"
     }
   }
 }
