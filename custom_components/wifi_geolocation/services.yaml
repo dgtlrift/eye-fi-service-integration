@@ -1,0 +1,17 @@
+resolve:
+  name: Resolve WiFi access points to coordinates
+  description: >-
+    Resolve a list of WiFi access point sightings (BSSID + signal strength)
+    to a lat/long via whichever backend(s) are configured for this
+    integration, in priority order. Returns resolved: false if none of the
+    configured backends could resolve a location.
+  fields:
+    access_points:
+      name: Access points
+      description: >-
+        List of WiFi AP sightings, each with a bssid (hex, colons optional)
+        and a signal_strength_dbm (integer, typically negative).
+      required: true
+      example: '[{"bssid": "0018560304f8", "signal_strength_dbm": -65}]'
+      selector:
+        object:

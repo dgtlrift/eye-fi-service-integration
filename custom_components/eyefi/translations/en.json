@@ -3,23 +3,18 @@
     "step": {
       "user": {
         "title": "Add an Eye-Fi card",
-        "description": "Enter the card's MAC address and upload key (found in Eye-Fi Manager's Settings.xml, or on the card packaging), the local directory to use for downloads/spooling, and where uploaded photos should end up.",
+        "description": "Enter the card's MAC address and upload key (found in Eye-Fi Manager's Settings.xml, or on the card packaging), the local directory to use for downloads/spooling, and where uploaded photos should end up. Geotagging is configured separately -- install and set up the WiFi Geolocation integration if you want GPS coordinates resolved from the card's WiFi scan; if it's not installed, geotagging is skipped automatically.",
         "data": {
           "mac": "MAC address (with or without colons)",
           "upload_key": "Upload key (32 hex characters)",
           "download_dir": "Local download/spool directory",
           "port": "Listen port",
-          "destination": "Storage destination",
-          "geotag_backend": "Geotagging backend"
+          "destination": "Storage destination"
         }
       },
       "destination": {
         "title": "Configure the storage destination",
         "description": "Fields depend on the destination you chose. For local/Apple destinations, the suggested path is a 'photos' subfolder under your download/spool directory, so the working copy and the final stored copy never collide."
-      },
-      "geotag": {
-        "title": "Configure the geotagging backend",
-        "description": "Provide credentials for the geolocation API used to resolve GPS coordinates from the card's WiFi scan."
       }
     },
     "error": {

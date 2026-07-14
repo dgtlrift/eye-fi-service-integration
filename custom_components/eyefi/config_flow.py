@@ -1,10 +1,16 @@
 """Config flow for the Eye-Fi integration.
 
-Collects the first card (mac + upload key), the storage destination (and
-that destination's own config), and an optional geotagging backend. The
-options flow lets the user add further cards afterward — eyefi_core takes
-all of them as a single ``{mac: upload_key}`` dict, mirroring the shape
-used by prior Eye-Fi servers.
+Collects the first card (mac + upload key) and the storage destination
+(and that destination's own config). The options flow lets the user add
+further cards afterward — eyefi_core takes all of them as a single
+``{mac: upload_key}`` dict, mirroring the shape used by prior Eye-Fi
+servers.
+
+No geotagging backend/API key is collected here at all — if the sibling
+``wifi_geolocation`` integration is installed and configured, eyefi calls
+its ``resolve`` service automatically; if not, geotagging is silently
+skipped. See ``custom_components/wifi_geolocation`` and this integration's
+``__init__.py``.
 
 This step only builds plain dicts/strings and hands them to eyefi_core via
 ``async_setup_entry`` — it never imports eyefi_core's protocol/geotag/
@@ -27,8 +33,6 @@ from .const import (
     CONF_DESTINATION,
     CONF_DESTINATION_CONFIG,
     CONF_DOWNLOAD_DIR,
-    CONF_GEOTAG_BACKEND,
-    CONF_GEOTAG_CONFIG,
     CONF_MAC,
     CONF_PORT,
     CONF_UPLOAD_KEY,
@@ -45,10 +49,6 @@ from .const import (
     DESTINATION_SMUGMUG,
     DESTINATIONS,
     DOMAIN,
-    GEOTAG_BACKEND_GOOGLE,
-    GEOTAG_BACKEND_NONE,
-    GEOTAG_BACKEND_WIGLE,
-    GEOTAG_BACKENDS,
 )
 
 _MAC_RE = re.compile(r"^[0-9a-f]{12}$")
@@ -82,7 +82,6 @@ _CARD_SCHEMA = vol.Schema(
         vol.Optional(CONF_DOWNLOAD_DIR, default=DEFAULT_DOWNLOAD_DIR): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
         vol.Required(CONF_DESTINATION, default=DESTINATION_LOCAL_NAS): vol.In(DESTINATIONS),
-        vol.Optional(CONF_GEOTAG_BACKEND, default=GEOTAG_BACKEND_NONE): vol.In(GEOTAG_BACKENDS),
     }
 )
 
@@ -129,19 +128,12 @@ _DESTINATION_SCHEMAS: dict[str, vol.Schema] = {
     ),
 }
 
+
 def _build_destination_schema(destination: str, download_dir: str) -> vol.Schema:
     if destination in _LOCAL_PATH_DESTINATIONS:
         default_path = str(Path(download_dir) / DEFAULT_LOCAL_STORAGE_SUBDIR)
         return vol.Schema({vol.Optional("path", default=default_path): str})
     return _DESTINATION_SCHEMAS[destination]
-
-
-_GEOTAG_SCHEMAS: dict[str, vol.Schema] = {
-    GEOTAG_BACKEND_GOOGLE: vol.Schema({vol.Required("api_key"): str}),
-    GEOTAG_BACKEND_WIGLE: vol.Schema(
-        {vol.Required("api_name"): str, vol.Required("api_token"): str}
-    ),
-}
 
 
 class EyeFiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -166,7 +158,6 @@ class EyeFiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_DOWNLOAD_DIR: user_input[CONF_DOWNLOAD_DIR],
                     CONF_PORT: user_input[CONF_PORT],
                     CONF_DESTINATION: user_input[CONF_DESTINATION],
-                    CONF_GEOTAG_BACKEND: user_input[CONF_GEOTAG_BACKEND],
                 }
                 return await self.async_step_destination()
 
@@ -180,22 +171,9 @@ class EyeFiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._data[CONF_DESTINATION_CONFIG] = user_input
-            return await self.async_step_geotag()
+            return self._create_entry()
 
         return self.async_show_form(step_id="destination", data_schema=schema)
-
-    async def async_step_geotag(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        backend = self._data[CONF_GEOTAG_BACKEND]
-        if backend == GEOTAG_BACKEND_NONE:
-            self._data[CONF_GEOTAG_CONFIG] = {}
-            return self._create_entry()
-
-        schema = _GEOTAG_SCHEMAS[backend]
-        if user_input is not None:
-            self._data[CONF_GEOTAG_CONFIG] = user_input
-            return self._create_entry()
-
-        return self.async_show_form(step_id="geotag", data_schema=schema)
 
     def _create_entry(self) -> FlowResult:
         title = f"Eye-Fi ({self._data[CONF_CARDS][0][CONF_MAC]})"

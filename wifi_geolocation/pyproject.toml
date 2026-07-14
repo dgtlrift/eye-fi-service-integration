@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wifi-geolocation-core"
+version = "0.1.0"
+description = "Async, framework-agnostic WiFi-AP-to-lat/long resolution behind one normalized interface, with pluggable Google/WiGLE backends"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
+[tool.setuptools.packages.find]
+include = ["wifi_geolocation_core*"]

@@ -13,8 +13,6 @@ CONF_UPLOAD_KEY = "upload_key"
 CONF_DOWNLOAD_DIR = "download_dir"
 CONF_DESTINATION = "destination"
 CONF_DESTINATION_CONFIG = "destination_config"
-CONF_GEOTAG_BACKEND = "geotag_backend"
-CONF_GEOTAG_CONFIG = "geotag_config"
 CONF_PORT = "port"
 
 DEFAULT_PORT = 59278
@@ -41,14 +39,15 @@ DESTINATIONS = [
     DESTINATION_PCLOUD,
 ]
 
-GEOTAG_BACKEND_NONE = "none"
-GEOTAG_BACKEND_GOOGLE = "google"
-GEOTAG_BACKEND_WIGLE = "wigle"
-
-GEOTAG_BACKENDS = [GEOTAG_BACKEND_NONE, GEOTAG_BACKEND_GOOGLE, GEOTAG_BACKEND_WIGLE]
-
 EVENT_IMAGE_RECEIVED = "eyefi_image_received"
 EVENT_IMAGE_GEOTAGGED = "eyefi_image_geotagged"
 EVENT_IMAGE_STORED = "eyefi_image_stored"
 
 SIGNAL_NEW_IMAGE = f"{DOMAIN}_new_image"
+
+# Optional sibling integration: if loaded, its "resolve" service is used
+# for geotagging. If not installed/loaded, geotagging is silently skipped
+# -- eyefi never holds a geolocation API key itself. See
+# custom_components/wifi_geolocation/.
+WIFI_GEOLOCATION_DOMAIN = "wifi_geolocation"
+WIFI_GEOLOCATION_SERVICE_RESOLVE = "resolve"

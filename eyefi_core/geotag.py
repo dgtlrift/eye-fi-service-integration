@@ -1,6 +1,6 @@
-"""Geotagging pipeline: parse the card's WiFi-scan ``.log`` sidecar,
-resolve a lat/long via a pluggable geolocation backend, and write the
-result into the JPEG's EXIF GPS tags with ``piexif``.
+"""Geotagging pipeline: parse the card's WiFi-scan ``.log`` sidecar, hand
+the sightings to a pluggable ``GeolocationBackend``, and write the
+resolved coordinates into the JPEG's EXIF GPS tags with ``piexif``.
 
 ``.log`` format (one CSV-ish record per line, ported from
 ``dgrant/eyefiserver2``'s ``parselog``/``getphotoaps`` — read-only
@@ -20,6 +20,13 @@ Known actions:
 
 Only AP sightings within ``geotag_lag`` seconds of the shot are considered
 for resolution, each weighted toward the reading closest in time.
+
+This module only defines the ``GeolocationBackend`` Protocol it needs —
+concrete backends (Google Geolocation API, WiGLE, ...) live in the
+separate ``wifi_geolocation_core`` package/HA integration, kept out of
+eyefi_core entirely so this package never needs to know a Google/WiGLE API
+key. Any object with a matching ``resolve()`` method satisfies the
+Protocol structurally; no import of wifi_geolocation_core is needed here.
 """
 
 from __future__ import annotations
@@ -31,7 +38,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-import aiohttp
 import piexif
 
 _LOGGER = logging.getLogger(__name__)
@@ -126,116 +132,8 @@ def select_access_points(
     return selected
 
 
-def format_bssid(bssid_hex: str) -> str:
-    """``"0018560304f8"`` -> ``"00:18:56:03:04:f8"``."""
-    return ":".join(bssid_hex[i : i + 2] for i in range(0, len(bssid_hex), 2)).lower()
-
-
 class GeolocationBackend(Protocol):
     async def resolve(self, access_points: list[AccessPoint]) -> Coordinates | None: ...
-
-
-GOOGLE_GEOLOCATION_URL = "https://www.googleapis.com/geolocation/v1/geolocate"
-
-
-@dataclass(frozen=True, slots=True)
-class GoogleGeolocationBackend:
-    """POSTs to Google's Geolocation API. Paid past the free tier — this is
-    what the pre-existing Eye-Fi server forks used (via the now-deprecated
-    ``browserlocation`` endpoint; this targets its documented successor)."""
-
-    api_key: str
-    session: aiohttp.ClientSession
-
-    async def resolve(self, access_points: list[AccessPoint]) -> Coordinates | None:
-        payload = {
-            "considerIp": False,
-            "wifiAccessPoints": [
-                {
-                    "macAddress": format_bssid(ap.bssid),
-                    "signalStrength": ap.signal_strength_dbm,
-                }
-                for ap in access_points
-            ],
-        }
-        try:
-            async with self.session.post(
-                GOOGLE_GEOLOCATION_URL,
-                params={"key": self.api_key},
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
-                if resp.status != 200:
-                    _LOGGER.warning("Google Geolocation API returned %s", resp.status)
-                    return None
-                body = await resp.json()
-        except aiohttp.ClientError:
-            _LOGGER.exception("Google Geolocation API request failed")
-            return None
-
-        location = body.get("location")
-        if not location:
-            return None
-        return Coordinates(
-            latitude=location["lat"],
-            longitude=location["lng"],
-            accuracy_m=body.get("accuracy"),
-        )
-
-
-WIGLE_SEARCH_URL = "https://api.wigle.net/api/v2/network/search"
-
-
-@dataclass(frozen=True, slots=True)
-class WigleGeolocationBackend:
-    """Free-tier fallback using WiGLE's community-sourced BSSID database.
-
-    WiGLE has no built-in multilateration endpoint, so this looks up each
-    BSSID's last-known location individually and returns the
-    signal-strength-weighted centroid of whichever BSSIDs it recognizes.
-    """
-
-    api_name: str
-    api_token: str
-    session: aiohttp.ClientSession
-
-    async def resolve(self, access_points: list[AccessPoint]) -> Coordinates | None:
-        auth = aiohttp.BasicAuth(self.api_name, self.api_token)
-        weighted_points: list[tuple[float, float, float]] = []
-
-        for ap in access_points:
-            try:
-                async with self.session.get(
-                    WIGLE_SEARCH_URL,
-                    params={"netid": format_bssid(ap.bssid)},
-                    auth=auth,
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status != 200:
-                        continue
-                    body = await resp.json()
-            except aiohttp.ClientError:
-                _LOGGER.exception("WiGLE lookup failed for %s", ap.bssid)
-                continue
-
-            results = body.get("results") or []
-            if not results:
-                continue
-            best = results[0]
-            if "trilat" not in best or "trilong" not in best:
-                continue
-
-            # Stronger (less negative) signal -> higher weight.
-            weight = 10 ** (ap.signal_strength_dbm / 10)
-            weighted_points.append((best["trilat"], best["trilong"], weight))
-
-        if not weighted_points:
-            return None
-
-        total_weight = sum(w for _, _, w in weighted_points)
-        lat = sum(lat * w for lat, _, w in weighted_points) / total_weight
-        lon = sum(lon * w for _, lon, w in weighted_points) / total_weight
-        return Coordinates(latitude=lat, longitude=lon)
 
 
 def _to_dms_rational(value: float) -> tuple[tuple[int, int], tuple[int, int], tuple[int, int]]:

@@ -5,21 +5,27 @@ eyefi_core's public API expects, start/stop eyefi_core embedded in HA's
 event loop, and translate eyefi_core's pub/sub events into
 ``hass.bus`` events. No protocol, geotag, or storage logic lives here —
 that's all in eyefi_core.
+
+Geotagging never holds a geolocation API key itself: if the sibling
+``wifi_geolocation`` integration is loaded, ``_ServiceBackedGeolocationBackend``
+below calls its ``resolve`` service; if not, geotagging is silently
+skipped (eyefi_core already treats "backend couldn't resolve" as a normal,
+non-fatal outcome).
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 
-import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 
-from eyefi_core import geotag as geotag_module
 from eyefi_core.events import Event, EventType
+from eyefi_core.geotag import AccessPoint, Coordinates
 from eyefi_core.soap_server import EyeFiSoapServer
 from eyefi_core.storage import SpoolingStorageBackend, create_backend
 
@@ -28,8 +34,6 @@ from .const import (
     CONF_DESTINATION,
     CONF_DESTINATION_CONFIG,
     CONF_DOWNLOAD_DIR,
-    CONF_GEOTAG_BACKEND,
-    CONF_GEOTAG_CONFIG,
     CONF_MAC,
     CONF_PORT,
     CONF_UPLOAD_KEY,
@@ -38,9 +42,8 @@ from .const import (
     EVENT_IMAGE_GEOTAGGED,
     EVENT_IMAGE_RECEIVED,
     EVENT_IMAGE_STORED,
-    GEOTAG_BACKEND_GOOGLE,
-    GEOTAG_BACKEND_NONE,
-    GEOTAG_BACKEND_WIGLE,
+    WIFI_GEOLOCATION_DOMAIN,
+    WIFI_GEOLOCATION_SERVICE_RESOLVE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,13 +59,44 @@ _HA_EVENT_MAP = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class _ServiceBackedGeolocationBackend:
+    """Satisfies eyefi_core.geotag.GeolocationBackend by delegating to the
+    wifi_geolocation integration's service, if it's loaded. No import of
+    wifi_geolocation_core needed here -- only the HA service-call JSON
+    contract is shared between the two integrations."""
+
+    hass: HomeAssistant
+
+    async def resolve(self, access_points: list[AccessPoint]) -> Coordinates | None:
+        if WIFI_GEOLOCATION_DOMAIN not in self.hass.config.components:
+            return None
+
+        response = await self.hass.services.async_call(
+            WIFI_GEOLOCATION_DOMAIN,
+            WIFI_GEOLOCATION_SERVICE_RESOLVE,
+            {
+                "access_points": [
+                    {"bssid": ap.bssid, "signal_strength_dbm": ap.signal_strength_dbm}
+                    for ap in access_points
+                ]
+            },
+            blocking=True,
+            return_response=True,
+        )
+        if not response or not response.get("resolved"):
+            return None
+        return Coordinates(
+            latitude=response["latitude"],
+            longitude=response["longitude"],
+            accuracy_m=response.get("accuracy_m"),
+        )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = entry.data
     cards = {card[CONF_MAC]: card[CONF_UPLOAD_KEY] for card in data[CONF_CARDS]}
     download_dir = Path(data[CONF_DOWNLOAD_DIR])
-
-    session = aiohttp.ClientSession()
-    geotag_backend = _build_geotag_backend(data, session)
 
     destination = data[CONF_DESTINATION]
     destination_config = dict(data[CONF_DESTINATION_CONFIG])
@@ -77,7 +111,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         cards=cards,
         download_dir=download_dir,
         storage_backend=storage_backend,
-        geotag_backend=geotag_backend,
+        geotag_backend=_ServiceBackedGeolocationBackend(hass=hass),
         port=data[CONF_PORT],
     )
 
@@ -96,7 +130,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "server": server,
-        "session": session,
         "unsub_retry": unsub_retry,
     }
 
@@ -110,18 +143,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         stored = hass.data[DOMAIN].pop(entry.entry_id)
         stored["unsub_retry"]()
         await stored["server"].stop()
-        await stored["session"].close()
     return unload_ok
-
-
-def _build_geotag_backend(data: dict, session: aiohttp.ClientSession):
-    backend_name = data.get(CONF_GEOTAG_BACKEND, GEOTAG_BACKEND_NONE)
-    config = data.get(CONF_GEOTAG_CONFIG, {})
-
-    if backend_name == GEOTAG_BACKEND_GOOGLE:
-        return geotag_module.GoogleGeolocationBackend(api_key=config["api_key"], session=session)
-    if backend_name == GEOTAG_BACKEND_WIGLE:
-        return geotag_module.WigleGeolocationBackend(
-            api_name=config["api_name"], api_token=config["api_token"], session=session
-        )
-    return None

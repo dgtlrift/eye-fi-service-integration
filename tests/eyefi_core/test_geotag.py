@@ -4,6 +4,20 @@ import pytest
 
 from eyefi_core import geotag
 
+
+class _FakeBackend:
+    """Satisfies geotag.GeolocationBackend structurally, with no shared
+    import — proof that eyefi_core doesn't need to know about
+    wifi_geolocation_core (or any specific backend) to use one."""
+
+    def __init__(self, coordinates: geotag.Coordinates | None):
+        self._coordinates = coordinates
+        self.received_access_points: list[geotag.AccessPoint] | None = None
+
+    async def resolve(self, access_points: list[geotag.AccessPoint]) -> geotag.Coordinates | None:
+        self.received_access_points = access_points
+        return self._coordinates
+
 SAMPLE_LOG = """\
 100,0,POWERON
 105,0,NEWAP,001122334455,80
@@ -49,10 +63,6 @@ def test_select_access_points_drops_readings_outside_lag():
     assert selected == []
 
 
-def test_format_bssid_inserts_colons():
-    assert geotag.format_bssid("0018560304f8") == "00:18:56:03:04:f8"
-
-
 def test_to_dms_rational_round_trips_reasonably():
     deg, minute, sec = geotag._to_dms_rational(37.7749)
     assert deg == (37, 1)
@@ -74,3 +84,38 @@ def test_write_gps_exif_writes_readable_gps_tags(tmp_path: Path):
     assert exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] == b"N"
     assert exif_dict["GPS"][piexif.GPSIFD.GPSLongitudeRef] == b"W"
     assert piexif.GPSIFD.GPSLatitude in exif_dict["GPS"]
+
+
+@pytest.mark.asyncio
+async def test_geotag_image_resolves_and_writes_exif_via_any_compatible_backend(tmp_path: Path):
+    piexif = pytest.importorskip("piexif")
+    Image = pytest.importorskip("PIL.Image")
+
+    image_path = tmp_path / "IMG_0001.JPG"
+    Image.new("RGB", (4, 4)).save(image_path, "jpeg")
+    log_path = tmp_path / "IMG_0001.log"
+    log_path.write_text(SAMPLE_LOG)
+
+    backend = _FakeBackend(geotag.Coordinates(latitude=37.7749, longitude=-122.4194))
+    result = await geotag.geotag_image(image_path=image_path, log_path=log_path, backend=backend)
+
+    assert result == geotag.Coordinates(latitude=37.7749, longitude=-122.4194)
+    assert backend.received_access_points  # AP selection actually ran and passed something
+    exif_dict = piexif.load(str(image_path))
+    assert exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] == b"N"
+
+
+@pytest.mark.asyncio
+async def test_geotag_image_returns_none_when_log_has_no_matching_photo(tmp_path: Path):
+    Image = pytest.importorskip("PIL.Image")
+
+    image_path = tmp_path / "IMG_9999.JPG"
+    Image.new("RGB", (4, 4)).save(image_path, "jpeg")
+    log_path = tmp_path / "IMG_9999.log"
+    log_path.write_text(SAMPLE_LOG)
+
+    backend = _FakeBackend(geotag.Coordinates(latitude=1.0, longitude=1.0))
+    result = await geotag.geotag_image(image_path=image_path, log_path=log_path, backend=backend)
+
+    assert result is None
+    assert backend.received_access_points is None  # never even called
