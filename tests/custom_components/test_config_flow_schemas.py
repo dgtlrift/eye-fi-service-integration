@@ -90,6 +90,20 @@ def test_destination_schemas_are_frontend_serializable(schemas):
         _serialize(schema)
 
 
+def test_local_path_destination_schemas_are_frontend_serializable(schemas):
+    build_destination_schema = schemas["_build_destination_schema"]
+    for destination in schemas["_LOCAL_PATH_DESTINATIONS"]:
+        _serialize(build_destination_schema(destination, "/config/eyefi_downloads"))
+
+
+def test_local_path_destination_default_is_subfolder_of_download_dir(schemas):
+    build_destination_schema = schemas["_build_destination_schema"]
+    for destination in schemas["_LOCAL_PATH_DESTINATIONS"]:
+        schema = build_destination_schema(destination, "/config/eyefi_downloads")
+        (marker,) = schema.schema.keys()
+        assert marker.default() == "/config/eyefi_downloads/photos"
+
+
 def test_geotag_schemas_are_frontend_serializable(schemas):
     for schema in schemas["_GEOTAG_SCHEMAS"].values():
         _serialize(schema)

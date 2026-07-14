@@ -18,6 +18,8 @@ CONF_GEOTAG_CONFIG = "geotag_config"
 CONF_PORT = "port"
 
 DEFAULT_PORT = 59278
+DEFAULT_DOWNLOAD_DIR = "/config/eyefi_downloads"
+DEFAULT_LOCAL_STORAGE_SUBDIR = "photos"
 
 DESTINATION_LOCAL_NAS = "local_nas"
 DESTINATION_REMOTE_NAS = "remote_nas"

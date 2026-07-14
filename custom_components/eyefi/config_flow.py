@@ -14,6 +14,7 @@ storage internals directly.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
@@ -31,6 +32,8 @@ from .const import (
     CONF_MAC,
     CONF_PORT,
     CONF_UPLOAD_KEY,
+    DEFAULT_DOWNLOAD_DIR,
+    DEFAULT_LOCAL_STORAGE_SUBDIR,
     DEFAULT_PORT,
     DESTINATION_APPLE_DROPFOLDER,
     DESTINATION_BACKBLAZE,
@@ -76,16 +79,19 @@ _CARD_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_MAC): str,
         vol.Required(CONF_UPLOAD_KEY): str,
-        vol.Required(CONF_DOWNLOAD_DIR): str,
+        vol.Optional(CONF_DOWNLOAD_DIR, default=DEFAULT_DOWNLOAD_DIR): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
         vol.Required(CONF_DESTINATION, default=DESTINATION_LOCAL_NAS): vol.In(DESTINATIONS),
         vol.Optional(CONF_GEOTAG_BACKEND, default=GEOTAG_BACKEND_NONE): vol.In(GEOTAG_BACKENDS),
     }
 )
 
+# local_nas/apple_dropfolder's "path" default depends on the download_dir the
+# user just entered, so those two are built per-flow-instance (see
+# _build_destination_schema) rather than kept in this static dict.
+_LOCAL_PATH_DESTINATIONS = (DESTINATION_LOCAL_NAS, DESTINATION_APPLE_DROPFOLDER)
+
 _DESTINATION_SCHEMAS: dict[str, vol.Schema] = {
-    DESTINATION_LOCAL_NAS: vol.Schema({vol.Required("path"): str}),
-    DESTINATION_APPLE_DROPFOLDER: vol.Schema({vol.Required("path"): str}),
     DESTINATION_REMOTE_NAS: vol.Schema(
         {
             vol.Required("protocol"): vol.In(["smb", "sftp"]),
@@ -122,6 +128,13 @@ _DESTINATION_SCHEMAS: dict[str, vol.Schema] = {
         {vol.Required("access_token"): str, vol.Optional("remote_folder", default="/Eye-Fi"): str}
     ),
 }
+
+def _build_destination_schema(destination: str, download_dir: str) -> vol.Schema:
+    if destination in _LOCAL_PATH_DESTINATIONS:
+        default_path = str(Path(download_dir) / DEFAULT_LOCAL_STORAGE_SUBDIR)
+        return vol.Schema({vol.Optional("path", default=default_path): str})
+    return _DESTINATION_SCHEMAS[destination]
+
 
 _GEOTAG_SCHEMAS: dict[str, vol.Schema] = {
     GEOTAG_BACKEND_GOOGLE: vol.Schema({vol.Required("api_key"): str}),
@@ -163,7 +176,7 @@ class EyeFiConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         destination = self._data[CONF_DESTINATION]
-        schema = _DESTINATION_SCHEMAS[destination]
+        schema = _build_destination_schema(destination, self._data[CONF_DOWNLOAD_DIR])
 
         if user_input is not None:
             self._data[CONF_DESTINATION_CONFIG] = user_input

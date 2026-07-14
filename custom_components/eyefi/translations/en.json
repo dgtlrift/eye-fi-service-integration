@@ -15,7 +15,7 @@
       },
       "destination": {
         "title": "Configure the storage destination",
-        "description": "Fields depend on the destination you chose."
+        "description": "Fields depend on the destination you chose. For local/Apple destinations, the suggested path is a 'photos' subfolder under your download/spool directory, so the working copy and the final stored copy never collide."
       },
       "geotag": {
         "title": "Configure the geotagging backend",
