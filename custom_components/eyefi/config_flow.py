@@ -13,6 +13,7 @@ storage internals directly.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import voluptuous as vol
@@ -47,10 +48,34 @@ from .const import (
     GEOTAG_BACKENDS,
 )
 
+_MAC_RE = re.compile(r"^[0-9a-f]{12}$")
+_UPLOAD_KEY_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _normalize_mac(value: str) -> str:
+    """Card utilities (e.g. eyefi-config -m) print the MAC colon-separated
+    (``00:18:56:41:25:f5``), but the wire protocol's <macaddress> element —
+    and eyefi_core's card lookup — uses the bare 12-hex-char form with no
+    separators. Strip separators here so either form works."""
+    normalized = re.sub(r"[:\-\s]", "", value).lower()
+    if not _MAC_RE.match(normalized):
+        raise vol.Invalid(
+            "MAC address must be 12 hex characters (colons/dashes are stripped automatically)"
+        )
+    return normalized
+
+
+def _normalize_upload_key(value: str) -> str:
+    normalized = re.sub(r"[\-\s]", "", value).lower()
+    if not _UPLOAD_KEY_RE.match(normalized):
+        raise vol.Invalid("Upload key must be 32 hex characters")
+    return normalized
+
+
 _CARD_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_MAC): str,
-        vol.Required(CONF_UPLOAD_KEY): str,
+        vol.Required(CONF_MAC): vol.All(str, _normalize_mac),
+        vol.Required(CONF_UPLOAD_KEY): vol.All(str, _normalize_upload_key),
         vol.Required(CONF_DOWNLOAD_DIR): str,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
         vol.Required(CONF_DESTINATION, default=DESTINATION_LOCAL_NAS): vol.In(DESTINATIONS),
@@ -184,6 +209,9 @@ class EyeFiOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
-                {vol.Required(CONF_MAC): str, vol.Required(CONF_UPLOAD_KEY): str}
+                {
+                    vol.Required(CONF_MAC): vol.All(str, _normalize_mac),
+                    vol.Required(CONF_UPLOAD_KEY): vol.All(str, _normalize_upload_key),
+                }
             ),
         )
