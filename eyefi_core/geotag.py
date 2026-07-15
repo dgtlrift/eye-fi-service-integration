@@ -13,7 +13,8 @@ Known actions:
 - ``AP`` / ``NEWAP`` — args: ``bssid, signal`` — a WiFi AP the card saw at
   ``<time>``, with the card's raw (non-dBm) signal reading.
 - ``NEWPHOTO`` — args: ``filename`` — marks ``<time>`` as the moment the
-  named photo (base filename, no extension) was taken.
+  named photo was taken. Real cards write the filename *with* its
+  extension (e.g. ``IMG_6344.JPG``), matched here against the stem.
 - ``POWERON`` — marks the start of a new card power cycle. A single
   ``.log`` file can span multiple power cycles; once a target photo's
   ``NEWPHOTO`` has been seen, the *next* ``POWERON`` ends that session.
@@ -94,7 +95,7 @@ def parse_log(log_text: str, image_stem: str) -> tuple[int, dict[str, list[ApSig
                 ApSighting(bssid=bssid, time=time_val, pwr=int(pwr))
             )
         elif action == "NEWPHOTO" and args:
-            if args[0] == image_stem:
+            if Path(args[0]).stem == image_stem:
                 shot_time = time_val
         elif action == "POWERON":
             if shot_time > 0:
