@@ -113,9 +113,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             AccessPoint(bssid=ap["bssid"], signal_strength_dbm=ap["signal_strength_dbm"])
             for ap in call.data["access_points"]
         ]
-        coordinates = await backend.resolve(access_points)
-        if coordinates is None:
+        try:
+            coordinates = await backend.resolve(access_points)
+        except Exception:
+            _LOGGER.exception("Resolving %d access point(s) failed", len(access_points))
             return {"resolved": False, "latitude": None, "longitude": None, "accuracy_m": None}
+
+        if coordinates is None:
+            _LOGGER.info("No backend resolved a location for %d access point(s)", len(access_points))
+            return {"resolved": False, "latitude": None, "longitude": None, "accuracy_m": None}
+
+        _LOGGER.info(
+            "Resolved %d access point(s) to %s, %s",
+            len(access_points),
+            coordinates.latitude,
+            coordinates.longitude,
+        )
         return {
             "resolved": True,
             "latitude": coordinates.latitude,

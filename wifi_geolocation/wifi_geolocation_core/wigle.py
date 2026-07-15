@@ -40,6 +40,12 @@ class WigleGeolocationBackend:
                     timeout=aiohttp.ClientTimeout(total=10),
                 ) as resp:
                     if resp.status != 200:
+                        _LOGGER.warning(
+                            "WiGLE lookup for %s returned HTTP %d: %s",
+                            ap.bssid,
+                            resp.status,
+                            (await resp.text())[:500],
+                        )
                         continue
                     body = await resp.json()
             except aiohttp.ClientError:
@@ -48,6 +54,7 @@ class WigleGeolocationBackend:
 
             results = body.get("results") or []
             if not results:
+                _LOGGER.debug("WiGLE has no record of %s", ap.bssid)
                 continue
             best = results[0]
             if "trilat" not in best or "trilong" not in best:
