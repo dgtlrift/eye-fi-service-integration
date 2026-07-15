@@ -26,6 +26,25 @@ _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PORT = 59278
 
+# Real card firmware from this era is known to gate behavior on the exact
+# Server/Content-Type/Pragma headers a genuine Eye-Fi server sent -- matched
+# here byte-for-byte against a reference implementation proven to work
+# against real hardware, rather than aiohttp's defaults.
+_RESPONSE_HEADERS = {
+    "Server": "Eye-Fi Agent/2.0.4.0 (Windows XP SP2)",
+    "Pragma": "no-cache",
+}
+
+
+def _soap_response(body: bytes, *, status: int = 200) -> web.Response:
+    return web.Response(
+        body=body,
+        status=status,
+        headers=_RESPONSE_HEADERS,
+        content_type="text/xml",
+        charset="utf-8",
+    )
+
 
 class EyeFiSoapServer:
     """One instance serves all cards configured via ``cards`` (mac ->
@@ -91,10 +110,7 @@ class EyeFiSoapServer:
             return await self._get_photo_status(body)
         if soap_action == protocol.SOAP_ACTION_MARK_LAST_PHOTO_IN_ROLL:
             _LOGGER.info("MarkLastPhotoInRoll received")
-            return web.Response(
-                body=protocol.build_mark_last_photo_in_roll_response(),
-                content_type="text/xml",
-            )
+            return _soap_response(protocol.build_mark_last_photo_in_roll_response())
 
         _LOGGER.warning("Unrecognized SOAPAction: %r", soap_action)
         return web.Response(status=400)
@@ -123,7 +139,7 @@ class EyeFiSoapServer:
             transfermodetimestamp=req.transfermodetimestamp,
             upsyncallowed=True,
         )
-        return web.Response(body=response, content_type="text/xml")
+        return _soap_response(response)
 
     async def _get_photo_status(self, body: bytes) -> web.Response:
         try:
@@ -140,9 +156,7 @@ class EyeFiSoapServer:
                 _LOGGER.warning("Credential mismatch for card %s", req.macaddress)
 
         _LOGGER.info("GetPhotoStatus from card %s", req.macaddress)
-        return web.Response(
-            body=protocol.build_get_photo_status_response(), content_type="text/xml"
-        )
+        return _soap_response(protocol.build_get_photo_status_response())
 
     # -- /api/soap/eyefilm/v1/upload -----------------------------------------
 
@@ -154,28 +168,19 @@ class EyeFiSoapServer:
             envelope = protocol.parse_upload_soap_envelope(parts["SOAPENVELOPE"])
         except (KeyError, protocol.ProtocolError):
             _LOGGER.exception("Malformed UploadPhoto SOAPENVELOPE")
-            return web.Response(
-                body=protocol.build_upload_photo_response(success=False),
-                content_type="text/xml",
-            )
+            return _soap_response(protocol.build_upload_photo_response(success=False))
 
         upload_key = self._cards.get(envelope.macaddress)
         if upload_key is None:
             _LOGGER.warning("UploadPhoto from unknown card mac %s", envelope.macaddress)
-            return web.Response(
-                body=protocol.build_upload_photo_response(success=False),
-                content_type="text/xml",
-            )
+            return _soap_response(protocol.build_upload_photo_response(success=False))
 
         try:
             tar_bytes = parts["FILENAME"]
             expected_digest = parts["INTEGRITYDIGEST"].decode().strip()
         except KeyError:
             _LOGGER.exception("UploadPhoto multipart missing FILENAME/INTEGRITYDIGEST part")
-            return web.Response(
-                body=protocol.build_upload_photo_response(success=False),
-                content_type="text/xml",
-            )
+            return _soap_response(protocol.build_upload_photo_response(success=False))
 
         try:
             extracted = await tar_extract.extract_upload(
@@ -186,10 +191,7 @@ class EyeFiSoapServer:
             )
         except tar_extract.IntegrityError:
             _LOGGER.exception("Integrity check failed for %s", envelope.filename)
-            return web.Response(
-                body=protocol.build_upload_photo_response(success=False),
-                content_type="text/xml",
-            )
+            return _soap_response(protocol.build_upload_photo_response(success=False))
 
         _LOGGER.info(
             "UploadPhoto from card %s: %d file(s) extracted", envelope.macaddress, len(extracted)
@@ -199,9 +201,7 @@ class EyeFiSoapServer:
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
 
-        return web.Response(
-            body=protocol.build_upload_photo_response(success=True), content_type="text/xml"
-        )
+        return _soap_response(protocol.build_upload_photo_response(success=True))
 
     async def _read_multipart(
         self, request: web.Request, content_type: str
