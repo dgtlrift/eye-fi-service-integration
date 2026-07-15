@@ -90,6 +90,7 @@ class EyeFiSoapServer:
         if soap_action == protocol.SOAP_ACTION_GET_PHOTO_STATUS:
             return await self._get_photo_status(body)
         if soap_action == protocol.SOAP_ACTION_MARK_LAST_PHOTO_IN_ROLL:
+            _LOGGER.info("MarkLastPhotoInRoll received")
             return web.Response(
                 body=protocol.build_mark_last_photo_in_roll_response(),
                 content_type="text/xml",
@@ -113,6 +114,7 @@ class EyeFiSoapServer:
         snonce = secrets.token_hex(16)
         self._session_nonces[req.macaddress] = snonce
         credential = protocol.start_session_credential(req.macaddress, req.cnonce, upload_key)
+        _LOGGER.info("StartSession established for card %s", req.macaddress)
 
         response = protocol.build_start_session_response(
             credential=credential,
@@ -136,6 +138,7 @@ class EyeFiSoapServer:
             if not secrets.compare_digest(req.credential, expected):
                 _LOGGER.warning("Credential mismatch for card %s", req.macaddress)
 
+        _LOGGER.info("GetPhotoStatus from card %s", req.macaddress)
         return web.Response(
             body=protocol.build_get_photo_status_response(), content_type="text/xml"
         )
@@ -187,6 +190,9 @@ class EyeFiSoapServer:
                 content_type="text/xml",
             )
 
+        _LOGGER.info(
+            "UploadPhoto from card %s: %d file(s) extracted", envelope.macaddress, len(extracted)
+        )
         for item in extracted:
             task = asyncio.create_task(self._process_upload(item, envelope.macaddress))
             self._background_tasks.add(task)
@@ -261,6 +267,7 @@ class EyeFiSoapServer:
             _LOGGER.exception("Storage failed for %s", item.image_path)
             return
 
+        _LOGGER.info("Image stored: %s (card %s)", item.image_path.name, macaddress)
         await self._event_bus.publish(
             Event(
                 EventType.IMAGE_STORED,
