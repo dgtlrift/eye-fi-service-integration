@@ -43,7 +43,11 @@ import piexif
 
 _LOGGER = logging.getLogger(__name__)
 
-DEFAULT_GEOTAG_LAG_SECONDS = 30
+
+# Real cards rescan roughly every 60s (observed on hardware), so a photo
+# taken just before the next scan can be 50-60s away from its nearest
+# sighting -- 30s left every real-world shot with zero eligible APs.
+DEFAULT_GEOTAG_LAG_SECONDS = 90
 
 
 @dataclass(frozen=True, slots=True)
