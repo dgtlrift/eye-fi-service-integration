@@ -121,6 +121,7 @@ class EyeFiSoapServer:
             snonce=snonce,
             transfermode=req.transfermode,
             transfermodetimestamp=req.transfermodetimestamp,
+            upsyncallowed=True,
         )
         return web.Response(body=response, content_type="text/xml")
 
