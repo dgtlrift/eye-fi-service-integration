@@ -1,14 +1,15 @@
 """Same regression guard as test_config_flow_schemas.py, applied to the
 wifi_geolocation integration's config flow -- its per-backend credential
-schemas and its priority-field schema must all survive
-voluptuous_serialize.convert() the way HA's frontend requires.
+schemas, its reorderable SelectSelector schema, and its numeric-priority
+fallback schema must all survive voluptuous_serialize.convert() the way
+HA's frontend requires.
 
-The priority schema uses one plain int field per backend (0 = disabled,
-1+ = priority) rather than a reorderable multi-select: HA's SelectSelector
-with multiple=True turned out, in live testing against a real HA
-instance, to only support *picking* options, not manually reordering them
-afterward. Plain int/vol.Range carries zero risk of that kind of surprise
-either way -- see config_flow.py's docstring.
+Two schemas exist for backend selection/priority: a reorderable
+SelectSelector (used when _selector_patch.py's runtime patch applies
+cleanly -- see that module and config_flow.py's docstring for why the
+patch exists at all) and a numeric-priority-field fallback (used if it
+doesn't). Both must independently be frontend-serializable and correctly
+round-trip through _parse_selected_backends.
 """
 
 import sys
@@ -32,8 +33,21 @@ def const(schemas):
     return sys.modules["custom_components.wifi_geolocation.const"]
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _patched(schemas):
+    # _reorder_schema() assumes the caller (normally _backend_field_schema)
+    # already applied the reorder patch -- do that once for this module's
+    # direct _reorder_schema tests.
+    assert schemas["patch_select_selector_reorder"]() is True
+
+
 def test_priority_schema_is_frontend_serializable(schemas):
     schema = schemas["_priority_schema"](defaults={})
+    _serialize(schema)
+
+
+def test_reorder_schema_is_frontend_serializable(schemas, const):
+    schema = schemas["_reorder_schema"](current=[const.BACKEND_GOOGLE])
     _serialize(schema)
 
 
@@ -48,6 +62,20 @@ def test_priority_schema_has_a_field_per_backend(schemas):
     prefix = schemas["CONF_PRIORITY_PREFIX"]
     for backend in schemas["BACKEND_PRIORITY_ORDER"]:
         assert f"{prefix}{backend}" in field_names
+
+
+def test_reorder_schema_offers_every_priority_ordered_backend(schemas, const):
+    schema = schemas["_reorder_schema"](current=[const.BACKEND_GOOGLE])
+    (selector_instance,) = schema.schema.values()
+    offered = {option["value"] for option in selector_instance.config["options"]}
+    assert offered == set(schemas["BACKEND_PRIORITY_ORDER"])
+
+
+def test_reorder_schema_allows_multiple_and_reorder(schemas, const):
+    schema = schemas["_reorder_schema"](current=[const.BACKEND_GOOGLE])
+    (selector_instance,) = schema.schema.values()
+    assert selector_instance.config["multiple"] is True
+    assert selector_instance.config["reorder"] is True
 
 
 def test_backends_from_priorities_orders_by_priority_not_input_order(schemas, const):
@@ -79,6 +107,23 @@ def test_priorities_from_backend_list_round_trips(schemas, const):
     assert backends_from_priorities(user_input) == ordered
 
 
+def test_parse_selected_backends_prefers_direct_list(schemas, const):
+    parse_selected_backends = schemas["_parse_selected_backends"]
+    ordered = [const.BACKEND_BEACONDB, const.BACKEND_WIGLE]
+
+    assert parse_selected_backends({schemas["CONF_BACKENDS"]: ordered}) == ordered
+
+
+def test_parse_selected_backends_falls_back_to_priorities(schemas, const):
+    parse_selected_backends = schemas["_parse_selected_backends"]
+    priority_field = schemas["_priority_field"]
+
+    user_input = {priority_field(b): 0 for b in schemas["BACKEND_PRIORITY_ORDER"]}
+    user_input[priority_field(const.BACKEND_WIGLE)] = 1
+
+    assert parse_selected_backends(user_input) == [const.BACKEND_WIGLE]
+
+
 def test_beacondb_has_no_credential_schema(schemas, const):
     # BeaconDB needs no API key -- it must be absent from the credential
     # queue entirely, not present with an empty schema.
@@ -86,6 +131,11 @@ def test_beacondb_has_no_credential_schema(schemas, const):
 
 
 def _serialize(schema):
-    voluptuous_serialize.convert(
-        schema, custom_serializer=lambda _schema: voluptuous_serialize.UNSUPPORTED
-    )
+    from homeassistant.helpers import selector
+
+    def custom_serializer(value):
+        if isinstance(value, selector.SelectSelector):
+            return {"selector": {"select": value.config}}
+        return voluptuous_serialize.UNSUPPORTED
+
+    voluptuous_serialize.convert(schema, custom_serializer=custom_serializer)

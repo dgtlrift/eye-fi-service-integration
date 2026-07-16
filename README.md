@@ -159,12 +159,17 @@ proper in-app authorization flow.
 Geotagging is handled entirely by the separate **WiFi Geolocation**
 integration (`custom_components/wifi_geolocation`) — install it if you
 want GPS coordinates resolved from the card's WiFi scan, skip it if you
-don't. Its config flow shows one priority field per backend (0 = disabled,
-1+ = priority, lower tried first); they're tried in ascending order at
-runtime, stopping at the first one that resolves a location. Change it
-any time via the integration's **Configure** button — reordering or
-adding/removing backends there doesn't require removing and re-adding the
-integration.
+don't. Its config flow lets you enable and order backends: normally a
+draggable chip list (HA's frontend has supported this for the `select`
+selector since 2023, but the Python-side schema never exposed it — see
+`_selector_patch.py`'s docstring for the full story and the reason a
+runtime patch is applied for it), falling back to one plain priority
+number per backend (0 = disabled, 1+ = priority, lower tried first) if
+that patch can't apply for any reason. Either way, they're tried in that
+order at runtime, stopping at the first one that resolves a location.
+Change it any time via the integration's **Configure** button —
+reordering or adding/removing backends there doesn't require removing
+and re-adding the integration.
 
 | Backend | Notes |
 |---|---|

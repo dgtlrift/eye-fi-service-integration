@@ -5,25 +5,30 @@ number of consumer integrations (eyefi, potentially others later) via the
 ``wifi_geolocation.resolve`` service — nobody else needs to hold a
 Google/WiGLE/Combain/HERE/Unwired Labs/Mozilla API key.
 
-Backend selection *and* priority both come from one plain integer field
-per backend (0 = disabled, 1+ = priority, lower tried first) rather than
-a drag-to-reorder widget: HA's SelectSelector with ``multiple=True``
-turned out to only support *picking* multiple options, not manually
-reordering them afterward, in live testing against a real HA instance --
-confirmed against HA core's current source: ``SelectSelectorConfig`` has
-no ``reorder`` field at all, unlike ``AreaSelectorConfig``/
-``EntitySelectorConfig``, which both gate a real ``reorder: bool`` behind
-``_validate_selector_reorder_config``. So this uses only
-``vol.Coerce(int)``/``vol.Range``, which are guaranteed frontend-serializable
-regardless of HA version (see ``custom_components/eyefi/config_flow.py``'s
-docstring for the original schema-serialization bug this project already
-hit once).
+Backend selection *and* priority ideally come from one reorderable
+``SelectSelector(multiple=True, reorder=True)`` field -- HA's frontend
+(``ha-selector-select.ts``) has fully supported drag-to-reorder there
+since 2023, but the Python-side ``SelectSelectorConfig`` in
+``home-assistant/core`` never grew a ``reorder`` key, so passing one
+raises "extra keys not allowed" on an unpatched HA install.
+``_selector_patch.py`` defensively monkeypatches that in at runtime,
+reusing HA's own ``_validate_selector_reorder_config`` (the exact
+function ``AreaSelectorConfig``/``EntitySelectorConfig`` already use for
+the same purpose) rather than reimplementing validation logic -- see its
+docstring for the full story and an upstream PR reference.
 
-TODO: if/when upstream HA adds ``reorder: bool`` support to
-``SelectSelectorConfig`` (a PR proposing exactly that is planned/in
-progress -- see project notes), switch this back to a single reorderable
-``SelectSelector(multiple=True, reorder=True)`` field instead of the
-per-backend integer fields below.
+If the patch can't apply for any reason (caught defensively, logged, HA
+internals changed shape, etc.), this falls back to one plain integer
+field per backend (0 = disabled, 1+ = priority, lower tried first)
+instead -- guaranteed frontend-serializable regardless of HA version
+(see ``custom_components/eyefi/config_flow.py``'s docstring for the
+original schema-serialization bug this project already hit once).
+``_parse_selected_backends`` transparently handles whichever shape of
+``user_input`` the shown schema actually produced.
+
+TODO: once the upstream PR ships in a stable HA release, delete
+``_selector_patch.py`` and the priority-field fallback entirely, keeping
+only the reorderable ``SelectSelector`` path unconditionally.
 
 Selected backends are then configured one at a time via a single reused
 step_id (``backend_config``), whose schema/description changes each time
@@ -42,7 +47,9 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import selector
 
+from ._selector_patch import patch_select_selector_reorder
 from .const import (
     BACKEND_COMBAIN,
     BACKEND_GOOGLE,
@@ -119,6 +126,36 @@ def _backends_from_priorities(user_input: dict[str, Any]) -> list[str]:
     return sorted(enabled, key=lambda b: user_input[_priority_field(b)])
 
 
+def _reorder_schema(*, current: list[str]) -> vol.Schema:
+    options = [
+        selector.SelectOptionDict(value=backend, label=BACKEND_LABELS[backend])
+        for backend in BACKEND_PRIORITY_ORDER
+    ]
+    return vol.Schema(
+        {
+            vol.Optional(CONF_BACKENDS, default=current): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=options, multiple=True, reorder=True)
+            )
+        }
+    )
+
+
+def _backend_field_schema(*, current: list[str]) -> vol.Schema:
+    """Reorderable SelectSelector if the local reorder patch applies
+    cleanly, else the numeric-priority-field fallback."""
+    if patch_select_selector_reorder():
+        return _reorder_schema(current=current)
+    return _priority_schema(defaults=_priorities_from_backend_list(current))
+
+
+def _parse_selected_backends(user_input: dict[str, Any]) -> list[str]:
+    """Handles whichever schema shape was actually shown: a direct
+    ordered list from the reorder field, or priority-number fields."""
+    if CONF_BACKENDS in user_input:
+        return list(user_input[CONF_BACKENDS])
+    return _backends_from_priorities(user_input)
+
+
 class WifiGeolocationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
@@ -132,7 +169,7 @@ class WifiGeolocationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         errors: dict[str, str] = {}
         if user_input is not None:
-            selected = _backends_from_priorities(user_input)
+            selected = _parse_selected_backends(user_input)
             if not selected:
                 errors["base"] = "no_backend_selected"
             else:
@@ -142,7 +179,7 @@ class WifiGeolocationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=_priority_schema(defaults={BACKEND_GOOGLE: 1}),
+            data_schema=_backend_field_schema(current=[BACKEND_GOOGLE]),
             errors=errors,
         )
 
@@ -193,7 +230,7 @@ class WifiGeolocationOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            selected = _backends_from_priorities(user_input)
+            selected = _parse_selected_backends(user_input)
             if not selected:
                 errors["base"] = "no_backend_selected"
             else:
@@ -209,7 +246,7 @@ class WifiGeolocationOptionsFlow(config_entries.OptionsFlow):
         current = self._config_entry.data.get(CONF_BACKENDS, [BACKEND_GOOGLE])
         return self.async_show_form(
             step_id="init",
-            data_schema=_priority_schema(defaults=_priorities_from_backend_list(current)),
+            data_schema=_backend_field_schema(current=current),
             errors=errors,
         )
 
