@@ -10,10 +10,20 @@ per backend (0 = disabled, 1+ = priority, lower tried first) rather than
 a drag-to-reorder widget: HA's SelectSelector with ``multiple=True``
 turned out to only support *picking* multiple options, not manually
 reordering them afterward, in live testing against a real HA instance --
-so this uses only ``vol.Coerce(int)``/``vol.Range``, which are guaranteed
-frontend-serializable regardless of HA version (see
-``custom_components/eyefi/config_flow.py``'s docstring for the original
-schema-serialization bug this project already hit once).
+confirmed against HA core's current source: ``SelectSelectorConfig`` has
+no ``reorder`` field at all, unlike ``AreaSelectorConfig``/
+``EntitySelectorConfig``, which both gate a real ``reorder: bool`` behind
+``_validate_selector_reorder_config``. So this uses only
+``vol.Coerce(int)``/``vol.Range``, which are guaranteed frontend-serializable
+regardless of HA version (see ``custom_components/eyefi/config_flow.py``'s
+docstring for the original schema-serialization bug this project already
+hit once).
+
+TODO: if/when upstream HA adds ``reorder: bool`` support to
+``SelectSelectorConfig`` (a PR proposing exactly that is planned/in
+progress -- see project notes), switch this back to a single reorderable
+``SelectSelector(multiple=True, reorder=True)`` field instead of the
+per-backend integer fields below.
 
 Selected backends are then configured one at a time via a single reused
 step_id (``backend_config``), whose schema/description changes each time
