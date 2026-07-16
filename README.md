@@ -179,7 +179,7 @@ and re-adding the integration.
 | **HERE Technologies Positioning API** | Needs an API key. |
 | **Combain Positioning API** | Needs an API key. |
 | **Unwired Labs LocationAPI** | Needs an API token; region-specific base URL (us1/eu1/...). |
-| **WiGLE** | Free-tier BSSID lookups against a community-sourced war-driving database; needs an API name/token pair. |
+| **WiGLE** | Free-tier BSSID lookups against a community-sourced war-driving database; needs an API name/token pair. Its daily query quota is easy to exhaust; a 429 response pauses all WiGLE lookups for 24h rather than continuing to hit an already-exhausted quota (see `wifi_geolocation_core/cooldown.py`) — other backends don't have this yet, but the same helper is trivial to apply if they start rate-limiting too. |
 
 Any other integration (not just eyefi) can resolve WiFi APs to coordinates
 the same way, by calling the `wifi_geolocation.resolve` service with a

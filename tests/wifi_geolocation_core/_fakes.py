@@ -14,6 +14,9 @@ class FakeResponse:
     async def json(self):
         return self._body
 
+    async def text(self):
+        return json_module.dumps(self._body)
+
 
 class FakeSession:
     """Records every request made and returns a scripted response for it."""
