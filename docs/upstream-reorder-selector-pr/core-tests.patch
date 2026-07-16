@@ -1,0 +1,26 @@
+diff --git a/tests/helpers/test_selector.py b/tests/helpers/test_selector.py
+index 95bbaaa..60bf9e3 100644
+--- a/tests/helpers/test_selector.py
++++ b/tests/helpers/test_selector.py
+@@ -1607,6 +1607,11 @@ def test_text_selector_schema(schema, valid_selections, invalid_selections) -> N
+             ("red", "blue"),
+             (0, None, ["red"]),
+         ),
++        (
++            {"options": ["red", "green", "blue"], "multiple": True, "reorder": True},
++            (["red"], ["green", "blue"], []),
++            ("cat", 0, None, "red"),
++        ),
+     ],
+ )
+ def test_select_selector_schema(schema, valid_selections, invalid_selections) -> None:
+@@ -1623,6 +1628,9 @@ def test_select_selector_schema(schema, valid_selections, invalid_selections) ->
+         {"options": [{"hello": "World"}]},
+         # Options must all be of the same type
+         {"options": ["red", {"value": "green", "label": "Emerald Green"}]},
++        # reorder can only be used when multiple is true
++        {"options": ["red"], "reorder": True},
++        {"options": ["red"], "reorder": True, "multiple": False},
+     ],
+ )
+ def test_select_selector_schema_error(schema) -> None:

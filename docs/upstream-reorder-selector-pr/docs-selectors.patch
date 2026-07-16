@@ -1,0 +1,17 @@
+diff --git a/source/_docs/blueprint/selectors.markdown b/source/_docs/blueprint/selectors.markdown
+index 0653be2..e86eb66 100644
+--- a/source/_docs/blueprint/selectors.markdown
++++ b/source/_docs/blueprint/selectors.markdown
+@@ -1449,6 +1449,12 @@ sort:
+   type: boolean
+   required: false
+   default: false
++reorder:
++  description: >
++    Allows reordering of selected options (only applies if `multiple` is set to `true`).
++  type: boolean
++  default: false
++  required: false
+ {% endconfiguration %}
+ 
+ Alternatively, a mapping can be used for the options. When you want to return

@@ -1,0 +1,45 @@
+diff --git a/homeassistant/helpers/selector.py b/homeassistant/helpers/selector.py
+index 5936aad..e4328cc 100644
+--- a/homeassistant/helpers/selector.py
++++ b/homeassistant/helpers/selector.py
+@@ -1798,6 +1798,7 @@ class SelectSelectorConfig(BaseSelectorConfig, total=False):
+     mode: SelectSelectorMode
+     translation_key: str
+     sort: bool
++    reorder: bool
+ 
+ 
+ @SELECTORS.register("select")
+@@ -1806,17 +1807,21 @@ class SelectSelector(Selector[SelectSelectorConfig]):
+ 
+     selector_type = "select"
+ 
+-    CONFIG_SCHEMA = make_selector_config_schema(
+-        {
+-            vol.Required("options"): vol.All(vol.Any([str], [select_option])),
+-            vol.Optional("multiple", default=False): cv.boolean,
+-            vol.Optional("custom_value", default=False): cv.boolean,
+-            vol.Optional("mode"): vol.All(
+-                vol.Coerce(SelectSelectorMode), lambda val: val.value
+-            ),
+-            vol.Optional("translation_key"): cv.string,
+-            vol.Optional("sort", default=False): cv.boolean,
+-        }
++    CONFIG_SCHEMA = vol.All(
++        make_selector_config_schema(
++            {
++                vol.Required("options"): vol.All(vol.Any([str], [select_option])),
++                vol.Optional("multiple", default=False): cv.boolean,
++                vol.Optional("custom_value", default=False): cv.boolean,
++                vol.Optional("mode"): vol.All(
++                    vol.Coerce(SelectSelectorMode), lambda val: val.value
++                ),
++                vol.Optional("translation_key"): cv.string,
++                vol.Optional("sort", default=False): cv.boolean,
++                vol.Optional("reorder", default=False): cv.boolean,
++            }
++        ),
++        _validate_selector_reorder_config,
+     )
+ 
+     def __init__(self, config: SelectSelectorConfig) -> None:
