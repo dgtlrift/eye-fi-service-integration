@@ -1,0 +1,10 @@
+backfill_geotags:
+  name: Backfill missing GPS EXIF tags
+  description: >-
+    Scan every already-uploaded photo's .log sidecar and geotag+re-store
+    whichever ones don't already have GPS EXIF tags, using whichever
+    wifi_geolocation backend(s) are configured right now. Useful after
+    fixing a geotagging bug or enabling wifi_geolocation after photos were
+    already uploaded without it. Returns counts of processed, tagged,
+    already_tagged, unresolved (no backend could resolve a location), and
+    errors.

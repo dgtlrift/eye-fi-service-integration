@@ -51,3 +51,7 @@ SIGNAL_NEW_IMAGE = f"{DOMAIN}_new_image"
 # custom_components/wifi_geolocation/.
 WIFI_GEOLOCATION_DOMAIN = "wifi_geolocation"
 WIFI_GEOLOCATION_SERVICE_RESOLVE = "resolve"
+
+# Retroactively geotags already-uploaded photos whose .log sidecar exists
+# but whose EXIF GPS tags are missing -- see eyefi_core.backfill.
+SERVICE_BACKFILL_GEOTAGS = "backfill_geotags"

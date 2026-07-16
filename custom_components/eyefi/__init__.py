@@ -21,9 +21,10 @@ from datetime import timedelta
 from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.helpers.event import async_track_time_interval
 
+from eyefi_core.backfill import BackfillSummary, backfill_geotags
 from eyefi_core.events import Event, EventType
 from eyefi_core.geotag import AccessPoint, Coordinates
 from eyefi_core.soap_server import EyeFiSoapServer
@@ -42,6 +43,7 @@ from .const import (
     EVENT_IMAGE_GEOTAGGED,
     EVENT_IMAGE_RECEIVED,
     EVENT_IMAGE_STORED,
+    SERVICE_BACKFILL_GEOTAGS,
     WIFI_GEOLOCATION_DOMAIN,
     WIFI_GEOLOCATION_SERVICE_RESOLVE,
 )
@@ -106,12 +108,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         create_backend(destination, destination_config),
         spool_dir=download_dir / ".spool",
     )
+    geotag_backend = _ServiceBackedGeolocationBackend(hass=hass)
 
     server = EyeFiSoapServer(
         cards=cards,
         download_dir=download_dir,
         storage_backend=storage_backend,
-        geotag_backend=_ServiceBackedGeolocationBackend(hass=hass),
+        geotag_backend=geotag_backend,
         port=data[CONF_PORT],
     )
 
@@ -131,10 +134,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "server": server,
         "unsub_retry": unsub_retry,
+        "download_dir": download_dir,
+        "storage_backend": storage_backend,
+        "geotag_backend": geotag_backend,
     }
+
+    if not hass.services.has_service(DOMAIN, SERVICE_BACKFILL_GEOTAGS):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_BACKFILL_GEOTAGS,
+            _make_backfill_handler(hass),
+            supports_response=SupportsResponse.ONLY,
+        )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+def _make_backfill_handler(hass: HomeAssistant):
+    async def _handle_backfill_geotags(call: ServiceCall) -> ServiceResponse:
+        total = BackfillSummary()
+        for entry_data in hass.data.get(DOMAIN, {}).values():
+            total += await backfill_geotags(
+                download_dir=entry_data["download_dir"],
+                geotag_backend=entry_data["geotag_backend"],
+                storage_backend=entry_data["storage_backend"],
+            )
+        return {
+            "processed": total.processed,
+            "tagged": total.tagged,
+            "already_tagged": total.already_tagged,
+            "unresolved": total.unresolved,
+            "errors": total.errors,
+        }
+
+    return _handle_backfill_geotags
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -143,4 +177,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         stored = hass.data[DOMAIN].pop(entry.entry_id)
         stored["unsub_retry"]()
         await stored["server"].stop()
+        if not hass.data[DOMAIN]:
+            hass.services.async_remove(DOMAIN, SERVICE_BACKFILL_GEOTAGS)
     return unload_ok
