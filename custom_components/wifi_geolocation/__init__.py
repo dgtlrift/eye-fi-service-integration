@@ -33,7 +33,6 @@ from .const import (
     BACKEND_GOOGLE,
     BACKEND_HERE,
     BACKEND_MOZILLA,
-    BACKEND_PRIORITY_ORDER,
     BACKEND_UNWIRED_LABS,
     BACKEND_WIGLE,
     CONF_BACKENDS,
@@ -97,8 +96,9 @@ def _build_one_backend(
 
 
 def _build_backend(data: dict[str, Any], session: aiohttp.ClientSession) -> GeolocationBackend:
-    enabled = [b for b in BACKEND_PRIORITY_ORDER if b in data[CONF_BACKENDS]]
-    backends = tuple(_build_one_backend(b, data.get(b, {}), session) for b in enabled)
+    # data[CONF_BACKENDS] is already in the user's chosen priority order --
+    # see config_flow.py's _backend_select_schema.
+    backends = tuple(_build_one_backend(b, data.get(b, {}), session) for b in data[CONF_BACKENDS])
     if len(backends) == 1:
         return backends[0]
     return FallbackGeolocationBackend(backends=backends)
@@ -145,7 +145,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"session": session}
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
+
+
+async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Options changes (e.g. reordering/adding backends via Configure)
+    rebuild the backend chain by reloading the whole entry."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

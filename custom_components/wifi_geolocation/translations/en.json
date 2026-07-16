@@ -3,15 +3,9 @@
     "step": {
       "user": {
         "title": "WiFi Geolocation backends",
-        "description": "Choose which WiFi-AP geolocation service(s) to enable. If more than one is enabled, they're tried in a fixed priority order (free/open services first, then paid ones, then WiGLE) until one resolves a location.",
+        "description": "Choose which WiFi-AP geolocation service(s) to enable. If more than one is enabled, they're tried in the order you select them here (drag to reorder) until one resolves a location.",
         "data": {
-          "enable_google": "Google Geolocation API",
-          "enable_beacondb": "BeaconDB (free, no account needed)",
-          "enable_mozilla": "Mozilla Location Service / self-hosted Ichnaea",
-          "enable_combain": "Combain Positioning API",
-          "enable_here": "HERE Technologies Positioning API",
-          "enable_unwired_labs": "Unwired Labs LocationAPI",
-          "enable_wigle": "WiGLE"
+          "backends": "Backends, in priority order"
         }
       },
       "backend_config": {
@@ -34,6 +28,34 @@
     },
     "abort": {
       "single_instance_allowed": "Only one WiFi Geolocation configuration is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "WiFi Geolocation backends",
+        "description": "Change which backend(s) are enabled and/or their priority order (drag to reorder). Backends that stay enabled keep their existing credentials; newly-added ones will prompt for credentials next.",
+        "data": {
+          "backends": "Backends, in priority order"
+        }
+      },
+      "backend_config": {
+        "title": "Configure {backend}",
+        "data": {
+          "google_api_key": "API key",
+          "wigle_api_name": "API name",
+          "wigle_api_token": "API token",
+          "combain_api_key": "API key",
+          "here_api_key": "API key",
+          "unwired_labs_api_key": "API token",
+          "unwired_labs_base_url": "API base URL (region-specific, e.g. us1/eu1)",
+          "mozilla_api_key": "API key (leave blank if your instance doesn't require one)",
+          "mozilla_base_url": "Ichnaea base URL (Mozilla's public instance was shut down in 2024 -- point this at a self-hosted Ichnaea instance)"
+        }
+      }
+    },
+    "error": {
+      "no_backend_selected": "Enable at least one backend."
     }
   }
 }

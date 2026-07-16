@@ -26,14 +26,48 @@ def stub_homeassistant() -> None:
     data_entry_flow_mod = ModuleType("homeassistant.data_entry_flow")
     data_entry_flow_mod.FlowResult = dict
 
+    helpers_mod = ModuleType("homeassistant.helpers")
+    selector_mod = ModuleType("homeassistant.helpers.selector")
+
+    class SelectSelector:
+        """Stands in for HA's real Selector class: a first-class callable
+        validator (not a bare function), so voluptuous_serialize can be
+        taught to recognize it via isinstance -- unlike the bare-function
+        case this project's other regression test guards against."""
+
+        def __init__(self, config):
+            self.config = config
+
+        def __call__(self, value):
+            return value
+
+    class SelectSelectorMode:
+        LIST = "list"
+        DROPDOWN = "dropdown"
+
+    def SelectSelectorConfig(**kwargs):
+        return kwargs
+
+    def SelectOptionDict(*, value, label):
+        return {"value": value, "label": label}
+
+    selector_mod.SelectSelector = SelectSelector
+    selector_mod.SelectSelectorConfig = SelectSelectorConfig
+    selector_mod.SelectSelectorMode = SelectSelectorMode
+    selector_mod.SelectOptionDict = SelectOptionDict
+    helpers_mod.selector = selector_mod
+
     ha.config_entries = config_entries_mod
     ha.core = core_mod
     ha.data_entry_flow = data_entry_flow_mod
+    ha.helpers = helpers_mod
 
     sys.modules.setdefault("homeassistant", ha)
     sys.modules.setdefault("homeassistant.config_entries", config_entries_mod)
     sys.modules.setdefault("homeassistant.core", core_mod)
     sys.modules.setdefault("homeassistant.data_entry_flow", data_entry_flow_mod)
+    sys.modules.setdefault("homeassistant.helpers", helpers_mod)
+    sys.modules.setdefault("homeassistant.helpers.selector", selector_mod)
 
 
 def load_config_flow_schemas(integration_domain: str) -> ModuleType:

@@ -1,8 +1,17 @@
 """Same regression guard as test_config_flow_schemas.py, applied to the
 wifi_geolocation integration's config flow -- its per-backend credential
-schemas and boolean-toggle main schema must all survive
+schemas and the backend-selection/priority-order schema must all survive
 voluptuous_serialize.convert() the way HA's frontend requires.
+
+The backend-selection schema uses HA's own SelectSelector (a first-class,
+recognized class -- not a bare custom function), which is the whole point:
+it's the thing that avoids repeating the real 500-error bug this project
+hit once already (see test_config_flow_schemas.py). _custom_serializer
+below stands in for what HA's real frontend serializer does for Selector
+instances.
 """
+
+import sys
 
 import pytest
 import voluptuous_serialize
@@ -15,8 +24,17 @@ def schemas():
     return load_config_flow_schemas("wifi_geolocation")
 
 
-def test_main_schema_is_frontend_serializable(schemas):
-    _serialize(schemas["_MAIN_SCHEMA"])
+@pytest.fixture(scope="module")
+def const(schemas):
+    # BACKEND_BEACONDB isn't imported by config_flow.py itself (unused
+    # there now), but is needed here -- grab it from the const module
+    # load_config_flow_schemas already registered in sys.modules.
+    return sys.modules["custom_components.wifi_geolocation.const"]
+
+
+def test_backend_select_schema_is_frontend_serializable(schemas):
+    schema = schemas["_backend_select_schema"](default=[schemas["BACKEND_GOOGLE"]])
+    _serialize(schema)
 
 
 def test_credential_schemas_are_frontend_serializable(schemas):
@@ -24,20 +42,31 @@ def test_credential_schemas_are_frontend_serializable(schemas):
         _serialize(schema)
 
 
-def test_main_schema_has_a_toggle_per_priority_ordered_backend(schemas):
-    enable_prefix = schemas["CONF_ENABLE_PREFIX"]
-    field_names = {marker.schema for marker in schemas["_MAIN_SCHEMA"].schema}
-    for backend in schemas["BACKEND_PRIORITY_ORDER"]:
-        assert f"{enable_prefix}{backend}" in field_names
+def test_backend_select_schema_offers_every_priority_ordered_backend(schemas):
+    schema = schemas["_backend_select_schema"](default=[schemas["BACKEND_GOOGLE"]])
+    (selector_instance,) = schema.schema.values()
+    offered = {option["value"] for option in selector_instance.config["options"]}
+    assert offered == set(schemas["BACKEND_PRIORITY_ORDER"])
 
 
-def test_beacondb_has_no_credential_schema(schemas):
+def test_backend_select_schema_allows_multiple(schemas):
+    schema = schemas["_backend_select_schema"](default=[schemas["BACKEND_GOOGLE"]])
+    (selector_instance,) = schema.schema.values()
+    assert selector_instance.config["multiple"] is True
+
+
+def test_beacondb_has_no_credential_schema(schemas, const):
     # BeaconDB needs no API key -- it must be absent from the credential
     # queue entirely, not present with an empty schema.
-    assert schemas["BACKEND_BEACONDB"] not in schemas["_CREDENTIAL_SCHEMAS"]
+    assert const.BACKEND_BEACONDB not in schemas["_CREDENTIAL_SCHEMAS"]
 
 
 def _serialize(schema):
-    voluptuous_serialize.convert(
-        schema, custom_serializer=lambda _schema: voluptuous_serialize.UNSUPPORTED
-    )
+    from homeassistant.helpers import selector
+
+    def custom_serializer(value):
+        if isinstance(value, selector.SelectSelector):
+            return {"selector": {"select": value.config}}
+        return voluptuous_serialize.UNSUPPORTED
+
+    voluptuous_serialize.convert(schema, custom_serializer=custom_serializer)
