@@ -25,6 +25,7 @@ from wifi_geolocation_core.here import HereGeolocationBackend
 from wifi_geolocation_core.models import AccessPoint, GeolocationBackend
 from wifi_geolocation_core.mozilla import MozillaGeolocationBackend
 from wifi_geolocation_core.unwired_labs import UnwiredLabsGeolocationBackend
+from wifi_geolocation_core.wifidb import WifiDbGeolocationBackend
 from wifi_geolocation_core.wigle import WigleGeolocationBackend
 
 from .const import (
@@ -34,6 +35,7 @@ from .const import (
     BACKEND_HERE,
     BACKEND_MOZILLA,
     BACKEND_UNWIRED_LABS,
+    BACKEND_WIFIDB,
     BACKEND_WIGLE,
     CONF_BACKENDS,
     CONF_COMBAIN_API_KEY,
@@ -92,6 +94,8 @@ def _build_one_backend(
         )
     if backend == BACKEND_BEACONDB:
         return BeaconDbGeolocationBackend(session=session)
+    if backend == BACKEND_WIFIDB:
+        return WifiDbGeolocationBackend(session=session)
     raise ValueError(f"Unknown backend {backend!r}")
 
 

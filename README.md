@@ -174,6 +174,7 @@ and re-adding the integration.
 | Backend | Notes |
 |---|---|
 | **BeaconDB** | Free, open, community-run — no account needed. |
+| **WifiDB** | Free, open, community-run — no account needed. A single-maintainer "Beta" project with no SLA; unlike every other backend here it returns no accuracy figure at all, so a fixed conservative estimate (100m — typical outdoor WiFi AP range) is used instead. Uses its `search.php` endpoint, not the documented `locate.php`, which turned out to be dead code in practice (queries a table its own live scanner no longer populates). |
 | **Mozilla Location Service** | Ichnaea-compatible. Mozilla's own public instance was shut down in 2024 — only useful pointed at a self-hosted Ichnaea instance; the base URL is configurable. |
 | **Google Geolocation API** | Needs an API key, paid past the free tier. |
 | **HERE Technologies Positioning API** | Needs an API key. |

@@ -9,6 +9,7 @@ BACKEND_HERE = "here"
 BACKEND_UNWIRED_LABS = "unwired_labs"
 BACKEND_BEACONDB = "beacondb"
 BACKEND_MOZILLA = "mozilla"
+BACKEND_WIFIDB = "wifidb"
 
 # Canonical listing order (free/open services first, then paid ones, then
 # WiGLE) -- only used to break ties when two backends are given the same
@@ -17,6 +18,7 @@ BACKEND_MOZILLA = "mozilla"
 BACKEND_PRIORITY_ORDER = [
     BACKEND_BEACONDB,
     BACKEND_MOZILLA,
+    BACKEND_WIFIDB,
     BACKEND_GOOGLE,
     BACKEND_HERE,
     BACKEND_COMBAIN,
@@ -32,6 +34,7 @@ BACKEND_LABELS = {
     BACKEND_UNWIRED_LABS: "Unwired Labs LocationAPI",
     BACKEND_BEACONDB: "BeaconDB (free, no account needed)",
     BACKEND_MOZILLA: "Mozilla Location Service / self-hosted Ichnaea",
+    BACKEND_WIFIDB: "WifiDB (free, no account needed -- beta community project)",
 }
 
 CONF_BACKENDS = "backends"  # stored in the config entry: list[str], in priority order

@@ -11,7 +11,7 @@ class FakeResponse:
         self.status = status
         self._body = body
 
-    async def json(self):
+    async def json(self, content_type=None):
         return self._body
 
     async def text(self):

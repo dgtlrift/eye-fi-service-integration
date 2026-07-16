@@ -12,7 +12,8 @@
           "priority_combain": "Combain Positioning API",
           "priority_here": "HERE Technologies Positioning API",
           "priority_unwired_labs": "Unwired Labs LocationAPI",
-          "priority_wigle": "WiGLE"
+          "priority_wigle": "WiGLE",
+          "priority_wifidb": "WifiDB (free, no account needed -- beta community project)"
         }
       },
       "backend_config": {
@@ -50,7 +51,8 @@
           "priority_combain": "Combain Positioning API",
           "priority_here": "HERE Technologies Positioning API",
           "priority_unwired_labs": "Unwired Labs LocationAPI",
-          "priority_wigle": "WiGLE"
+          "priority_wigle": "WiGLE",
+          "priority_wifidb": "WifiDB (free, no account needed -- beta community project)"
         }
       },
       "backend_config": {

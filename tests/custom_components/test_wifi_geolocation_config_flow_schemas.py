@@ -130,6 +130,11 @@ def test_beacondb_has_no_credential_schema(schemas, const):
     assert const.BACKEND_BEACONDB not in schemas["_CREDENTIAL_SCHEMAS"]
 
 
+def test_wifidb_has_no_credential_schema(schemas, const):
+    # WifiDB is also free/keyless -- same as BeaconDB above.
+    assert const.BACKEND_WIFIDB not in schemas["_CREDENTIAL_SCHEMAS"]
+
+
 def _serialize(schema):
     from homeassistant.helpers import selector
 

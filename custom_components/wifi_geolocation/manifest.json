@@ -9,5 +9,5 @@
   "requirements": [
     "wifi-geolocation-core @ git+https://github.com/dgtlrift/eye-fi-service-integration.git@main#subdirectory=wifi_geolocation"
   ],
-  "version": "0.3.0"
+  "version": "0.4.0"
 }
