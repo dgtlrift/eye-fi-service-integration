@@ -10,11 +10,10 @@ BACKEND_UNWIRED_LABS = "unwired_labs"
 BACKEND_BEACONDB = "beacondb"
 BACKEND_MOZILLA = "mozilla"
 
-# Default/suggested listing order for the config flow's backend selector
-# (free/open services first, then paid ones, then WiGLE) -- shown for
-# unselected options. The user's own selection *order* is what actually
-# controls priority at runtime (see wifi_geolocation/__init__.py's
-# _build_backend); this is not an enforced fallback order.
+# Canonical listing order (free/open services first, then paid ones, then
+# WiGLE) -- only used to break ties when two backends are given the same
+# priority number in the config flow, and to order the priority-field form.
+# Not an enforced fallback order; the user's own priority numbers are.
 BACKEND_PRIORITY_ORDER = [
     BACKEND_BEACONDB,
     BACKEND_MOZILLA,
@@ -36,6 +35,7 @@ BACKEND_LABELS = {
 }
 
 CONF_BACKENDS = "backends"  # stored in the config entry: list[str], in priority order
+CONF_PRIORITY_PREFIX = "priority_"  # form field per backend; 0 = disabled
 
 CONF_GOOGLE_API_KEY = "google_api_key"
 CONF_WIGLE_API_NAME = "wigle_api_name"

@@ -3,9 +3,15 @@
     "step": {
       "user": {
         "title": "WiFi Geolocation backends",
-        "description": "Choose which WiFi-AP geolocation service(s) to enable. If more than one is enabled, they're tried in the order you select them here (drag to reorder) until one resolves a location.",
+        "description": "Set a priority number for each backend you want to enable (1 = tried first); leave at 0 to disable. They're tried in ascending priority order until one resolves a location.",
         "data": {
-          "backends": "Backends, in priority order"
+          "priority_google": "Google Geolocation API",
+          "priority_beacondb": "BeaconDB (free, no account needed)",
+          "priority_mozilla": "Mozilla Location Service / self-hosted Ichnaea",
+          "priority_combain": "Combain Positioning API",
+          "priority_here": "HERE Technologies Positioning API",
+          "priority_unwired_labs": "Unwired Labs LocationAPI",
+          "priority_wigle": "WiGLE"
         }
       },
       "backend_config": {
@@ -24,7 +30,7 @@
       }
     },
     "error": {
-      "no_backend_selected": "Enable at least one backend."
+      "no_backend_selected": "Enable at least one backend (set its priority above 0)."
     },
     "abort": {
       "single_instance_allowed": "Only one WiFi Geolocation configuration is allowed."
@@ -34,9 +40,15 @@
     "step": {
       "init": {
         "title": "WiFi Geolocation backends",
-        "description": "Change which backend(s) are enabled and/or their priority order (drag to reorder). Backends that stay enabled keep their existing credentials; newly-added ones will prompt for credentials next.",
+        "description": "Change which backend(s) are enabled and/or their priority number (1 = tried first, 0 = disabled). Backends that stay enabled keep their existing credentials; newly-enabled ones will prompt for credentials next.",
         "data": {
-          "backends": "Backends, in priority order"
+          "priority_google": "Google Geolocation API",
+          "priority_beacondb": "BeaconDB (free, no account needed)",
+          "priority_mozilla": "Mozilla Location Service / self-hosted Ichnaea",
+          "priority_combain": "Combain Positioning API",
+          "priority_here": "HERE Technologies Positioning API",
+          "priority_unwired_labs": "Unwired Labs LocationAPI",
+          "priority_wigle": "WiGLE"
         }
       },
       "backend_config": {
@@ -55,7 +67,7 @@
       }
     },
     "error": {
-      "no_backend_selected": "Enable at least one backend."
+      "no_backend_selected": "Enable at least one backend (set its priority above 0)."
     }
   }
 }

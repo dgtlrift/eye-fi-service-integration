@@ -5,21 +5,21 @@ number of consumer integrations (eyefi, potentially others later) via the
 ``wifi_geolocation.resolve`` service — nobody else needs to hold a
 Google/WiGLE/Combain/HERE/Unwired Labs/Mozilla API key.
 
-Backend selection *and* priority order both come from one
-``SelectSelector`` field (``multiple=True``): the order the user picks
-them in becomes the order they're tried in at runtime (see
-``__init__.py``'s ``_build_backend``) — no separate "priority" field,
-since the selection order already carries that. This is a first-class HA
-Selector class, not a bare custom function, so it doesn't repeat the real
-bug this project already hit (a schema validator ``voluptuous_serialize``
-couldn't handle, causing a 500 on every "Add Integration" attempt) — see
-``custom_components/eyefi/config_flow.py``'s docstring for that story.
+Backend selection *and* priority both come from one plain integer field
+per backend (0 = disabled, 1+ = priority, lower tried first) rather than
+a drag-to-reorder widget: HA's SelectSelector with ``multiple=True``
+turned out to only support *picking* multiple options, not manually
+reordering them afterward, in live testing against a real HA instance --
+so this uses only ``vol.Coerce(int)``/``vol.Range``, which are guaranteed
+frontend-serializable regardless of HA version (see
+``custom_components/eyefi/config_flow.py``'s docstring for the original
+schema-serialization bug this project already hit once).
 
 Selected backends are then configured one at a time via a single reused
 step_id (``backend_config``), whose schema/description changes each time
 based on which backend is next in the queue -- avoids a fixed step method
 per backend. The options flow (``Configure`` on an existing entry) reruns
-the same selection+reorder step and the same per-backend credential step,
+the same priority-field step and the same per-backend credential step,
 but skips re-prompting for credentials of backends that stay enabled and
 already have them stored.
 """
@@ -32,7 +32,6 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import selector
 
 from .const import (
     BACKEND_COMBAIN,
@@ -49,6 +48,7 @@ from .const import (
     CONF_HERE_API_KEY,
     CONF_MOZILLA_API_KEY,
     CONF_MOZILLA_BASE_URL,
+    CONF_PRIORITY_PREFIX,
     CONF_UNWIRED_LABS_API_KEY,
     CONF_UNWIRED_LABS_BASE_URL,
     CONF_WIGLE_API_NAME,
@@ -80,23 +80,33 @@ _CREDENTIAL_SCHEMAS: dict[str, vol.Schema] = {
     ),
 }
 
+_MAX_PRIORITY = len(BACKEND_PRIORITY_ORDER)
 
-def _backend_select_schema(*, default: list[str]) -> vol.Schema:
-    options = [
-        selector.SelectOptionDict(value=backend, label=BACKEND_LABELS[backend])
-        for backend in BACKEND_PRIORITY_ORDER
-    ]
+
+def _priority_field(backend: str) -> str:
+    return f"{CONF_PRIORITY_PREFIX}{backend}"
+
+
+def _priority_schema(*, defaults: dict[str, int]) -> vol.Schema:
     return vol.Schema(
         {
-            vol.Optional(CONF_BACKENDS, default=default): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=options,
-                    multiple=True,
-                    mode=selector.SelectSelectorMode.LIST,
-                )
+            vol.Optional(_priority_field(backend), default=defaults.get(backend, 0)): vol.All(
+                vol.Coerce(int), vol.Range(min=0, max=_MAX_PRIORITY)
             )
+            for backend in BACKEND_PRIORITY_ORDER
         }
     )
+
+
+def _priorities_from_backend_list(backends: list[str]) -> dict[str, int]:
+    """0 = disabled; enabled backends get their 1-based position as a
+    starting priority, so reopening Configure shows the current order."""
+    return {backend: index + 1 for index, backend in enumerate(backends)}
+
+
+def _backends_from_priorities(user_input: dict[str, Any]) -> list[str]:
+    enabled = [b for b in BACKEND_PRIORITY_ORDER if user_input[_priority_field(b)] > 0]
+    return sorted(enabled, key=lambda b: user_input[_priority_field(b)])
 
 
 class WifiGeolocationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -112,7 +122,7 @@ class WifiGeolocationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         errors: dict[str, str] = {}
         if user_input is not None:
-            selected = user_input[CONF_BACKENDS]
+            selected = _backends_from_priorities(user_input)
             if not selected:
                 errors["base"] = "no_backend_selected"
             else:
@@ -122,7 +132,7 @@ class WifiGeolocationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=_backend_select_schema(default=[BACKEND_GOOGLE]),
+            data_schema=_priority_schema(defaults={BACKEND_GOOGLE: 1}),
             errors=errors,
         )
 
@@ -157,9 +167,9 @@ class WifiGeolocationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class WifiGeolocationOptionsFlow(config_entries.OptionsFlow):
-    """Change which backends are enabled and/or reorder their priority.
+    """Change which backends are enabled and/or their priority.
 
-    Reruns the same backend-selection + per-backend credential steps as
+    Reruns the same priority-field + per-backend credential steps as
     initial setup, but carries over credentials for any backend that's
     still enabled and already configured -- only newly-added backends (or
     ones with no credentials to begin with) get prompted again.
@@ -173,7 +183,7 @@ class WifiGeolocationOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            selected = user_input[CONF_BACKENDS]
+            selected = _backends_from_priorities(user_input)
             if not selected:
                 errors["base"] = "no_backend_selected"
             else:
@@ -186,11 +196,10 @@ class WifiGeolocationOptionsFlow(config_entries.OptionsFlow):
                 ]
                 return await self._async_step_next_backend()
 
+        current = self._config_entry.data.get(CONF_BACKENDS, [BACKEND_GOOGLE])
         return self.async_show_form(
             step_id="init",
-            data_schema=_backend_select_schema(
-                default=self._config_entry.data.get(CONF_BACKENDS, [BACKEND_GOOGLE])
-            ),
+            data_schema=_priority_schema(defaults=_priorities_from_backend_list(current)),
             errors=errors,
         )
 

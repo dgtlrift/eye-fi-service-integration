@@ -159,10 +159,10 @@ proper in-app authorization flow.
 Geotagging is handled entirely by the separate **WiFi Geolocation**
 integration (`custom_components/wifi_geolocation`) — install it if you
 want GPS coordinates resolved from the card's WiFi scan, skip it if you
-don't. Enable any combination of these backends in its config flow; the
-*order you select them in* (drag to reorder) is the order they're tried
-in at runtime, stopping at the first one that resolves a location. Change
-it any time via the integration's **Configure** button — reordering or
+don't. Its config flow shows one priority field per backend (0 = disabled,
+1+ = priority, lower tried first); they're tried in ascending order at
+runtime, stopping at the first one that resolves a location. Change it
+any time via the integration's **Configure** button — reordering or
 adding/removing backends there doesn't require removing and re-adding the
 integration.
 
