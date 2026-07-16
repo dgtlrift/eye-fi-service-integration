@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Original artwork: orange SD card silhouette with a centered WiFi
+       glyph, representing an Eye-Fi card. Not submitted to
+       home-assistant/brands; see README. -->
+  <rect width="256" height="256" fill="#1b1f27"/>
+  <g transform="translate(58,54)">
+    <path d="M0 18 L78 18 L96 0 L118 0 A18 18 0 0 1 136 18 L136 148 A18 18 0 0 1 118 166 L18 166 A18 18 0 0 1 0 148 Z"
+          fill="#F4791C" stroke="#B85A0E" stroke-width="4"/>
+    <rect x="16" y="16" width="20" height="46" rx="3" fill="#C9A227"/>
+    <rect x="42" y="16" width="20" height="46" rx="3" fill="#C9A227"/>
+    <rect x="68" y="16" width="20" height="46" rx="3" fill="#C9A227"/>
+    <rect x="94" y="16" width="20" height="46" rx="3" fill="#C9A227"/>
+  </g>
+  <!-- WiFi glyph centered on the card face, below the contacts.
+       Waves spread 45 degrees each side of vertical, not a full semicircle. -->
+  <circle cx="126" cy="176" r="8" fill="#FFFFFF"/>
+  <path d="M112 162 A20 20 0 0 1 140 162" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M102 152 A34 34 0 0 1 150 152" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M92 142 A48 48 0 0 1 160 142" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+</svg>

@@ -30,6 +30,7 @@ async def async_setup_entry(
 
 class EyeFiCamera(Camera):
     _attr_should_poll = False
+    _attr_icon = "mdi:image-multiple"
 
     def __init__(self, entry_id: str, name: str) -> None:
         super().__init__()

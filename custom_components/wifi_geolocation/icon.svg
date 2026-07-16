@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Original artwork: globe background with a geopin whose head doubles
+       as a WiFi glyph, representing WiFi-AP based geolocation. Not
+       submitted to home-assistant/brands; see README. -->
+  <rect width="256" height="256" fill="#182a3d"/>
+
+  <!-- Globe background -->
+  <circle cx="128" cy="128" r="88" fill="none" stroke="#3f6b8f" stroke-width="5"/>
+  <ellipse cx="128" cy="128" rx="32" ry="88" fill="none" stroke="#3f6b8f" stroke-width="5"/>
+  <line x1="40" y1="128" x2="216" y2="128" stroke="#3f6b8f" stroke-width="5"/>
+
+  <!-- Geopin, tip landing inside the globe -->
+  <path d="M104 138 L152 138 L128 196 Z" fill="#f4f6fb"/>
+  <circle cx="128" cy="110" r="34" fill="#f4f6fb"/>
+
+  <!-- WiFi glyph inside the pin's head: waves spread 45 degrees each side
+       of vertical, not a full semicircle -->
+  <circle cx="128" cy="110" r="27" fill="#182a3d"/>
+  <circle cx="128" cy="119" r="3" fill="#5ec8f8"/>
+  <path d="M122.3 113.3 A8 8 0 0 1 133.7 113.3" fill="none" stroke="#5ec8f8" stroke-width="3" stroke-linecap="round"/>
+  <path d="M117.4 108.4 A15 15 0 0 1 138.6 108.4" fill="none" stroke="#5ec8f8" stroke-width="3" stroke-linecap="round"/>
+</svg>
