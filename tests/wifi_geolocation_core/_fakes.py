@@ -39,3 +39,24 @@ class FakeSession:
 
 def fake_session(status: int, body: dict) -> FakeSession:
     return FakeSession(FakeResponse(status, body))
+
+
+class RaisingSession:
+    """Fake session whose get()/post() raise on entry, e.g. to simulate a
+    timeout -- lets tests assert a backend's resolve() survives it."""
+
+    def __init__(self, exc: BaseException):
+        self._exc = exc
+        self.requests: list[dict] = []
+
+    @asynccontextmanager
+    async def _request(self, method: str, url: str, **kwargs):
+        self.requests.append({"method": method, "url": url, **kwargs})
+        raise self._exc
+        yield  # pragma: no cover -- unreachable, keeps this a generator
+
+    def post(self, url, **kwargs):
+        return self._request("POST", url, **kwargs)
+
+    def get(self, url, **kwargs):
+        return self._request("GET", url, **kwargs)

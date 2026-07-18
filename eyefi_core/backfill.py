@@ -64,7 +64,9 @@ async def backfill_geotags(
     loop = asyncio.get_running_loop()
     summary = BackfillSummary()
 
-    for log_path in sorted(download_dir.glob("*/*.log")):
+    log_paths = await loop.run_in_executor(None, lambda: sorted(download_dir.glob("*/*.log")))
+
+    for log_path in log_paths:
         image_path = log_path.with_suffix("")
         if not image_path.is_file():
             continue

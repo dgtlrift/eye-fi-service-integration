@@ -72,7 +72,11 @@ class WigleGeolocationBackend:
                         )
                         continue
                     body = await resp.json()
-            except aiohttp.ClientError:
+            except (aiohttp.ClientError, TimeoutError):
+                # aiohttp.ClientTimeout(total=...) raises a bare
+                # TimeoutError/asyncio.TimeoutError, not an
+                # aiohttp.ClientError subclass -- see wifidb.py's resolve()
+                # for the same fix, applied here defensively too.
                 _LOGGER.exception("WiGLE lookup failed for %s", ap.bssid)
                 continue
 

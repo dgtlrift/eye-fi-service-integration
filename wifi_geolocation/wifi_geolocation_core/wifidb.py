@@ -83,7 +83,15 @@ class WifiDbGeolocationBackend:
                     # live service, confirmed by hand; content_type=None
                     # tells aiohttp not to reject it over the wrong header.
                     records = await resp.json(content_type=None)
-            except aiohttp.ClientError:
+            except (aiohttp.ClientError, TimeoutError):
+                # aiohttp.ClientTimeout(total=...) raises a bare
+                # TimeoutError/asyncio.TimeoutError, not an
+                # aiohttp.ClientError subclass -- confirmed live: this
+                # single-maintainer beta service is slow/flaky enough
+                # under real load that timeouts here are routine, and
+                # missing this left them uncaught (crashing this
+                # backend's resolve() and forcing FallbackGeolocationBackend
+                # to swallow it as an unexpected error for every AP).
                 _LOGGER.exception("WifiDB lookup failed for %s", ap.bssid)
                 continue
 

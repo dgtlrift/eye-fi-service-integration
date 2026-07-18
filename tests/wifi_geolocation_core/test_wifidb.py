@@ -1,6 +1,6 @@
 import pytest
 
-from _fakes import fake_session
+from _fakes import RaisingSession, fake_session
 from wifi_geolocation_core.models import AccessPoint, Coordinates
 from wifi_geolocation_core.wifidb import DEFAULT_ACCURACY_M, WifiDbGeolocationBackend
 
@@ -93,6 +93,25 @@ async def test_wifidb_skips_lookup_entirely_while_in_cooldown():
 
     assert result is None
     assert len(session.requests) == request_count_after_first_call
+
+
+@pytest.mark.asyncio
+async def test_wifidb_timeout_on_one_ap_does_not_crash_resolve():
+    # aiohttp.ClientTimeout(total=...) raises a bare TimeoutError, not an
+    # aiohttp.ClientError subclass -- confirmed live against WifiDB's real
+    # (single-maintainer, beta, no SLA) API. resolve() must survive it and
+    # keep trying remaining access points instead of propagating.
+    many_aps = [
+        AccessPoint(bssid="0018560304f8", signal_strength_dbm=-65),
+        AccessPoint(bssid="001122334455", signal_strength_dbm=-70),
+    ]
+    session = RaisingSession(TimeoutError())
+    backend = WifiDbGeolocationBackend(session=session)
+
+    result = await backend.resolve(many_aps)
+
+    assert result is None
+    assert len(session.requests) == 2  # kept going past the timeout
 
 
 @pytest.mark.asyncio
